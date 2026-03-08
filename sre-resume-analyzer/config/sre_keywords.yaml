@@ -1,0 +1,433 @@
+# SRE 关键词配置
+# SRE Keywords Configuration
+
+version: "1.0"
+last_updated: "2026-03-05"
+
+# AI 和智能运维关键词
+ai_and_intelligent_ops:
+  llm:
+    - LLM
+    - GPT
+    - Claude
+    - ChatGPT
+    - prompt engineering
+    - RAG
+    - vector database
+    - LangChain
+    - semantic search
+    - text generation
+
+  ai_agents:
+    - AI Agent
+    - autonomous agent
+    - intelligent agent
+    - multi-agent system
+    - agent orchestration
+    - function calling
+    - tool use
+    - agent workflow
+
+  ai_ide:
+    - Cursor
+    - GitHub Copilot
+    - Tabnine
+    - Codeium
+    - Amazon CodeWhisperer
+    - AI-assisted coding
+    - intelligent code completion
+
+  ml_ops:
+    - machine learning
+    - deep learning
+    - TensorFlow
+    - PyTorch
+    - scikit-learn
+    - time series forecasting
+    - anomaly detection
+    - classification
+    - regression
+    - clustering
+
+  aiops:
+    - AIOps
+    - intelligent monitoring
+    - smart alerting
+    - automated diagnosis
+    - predictive maintenance
+    - intelligent automation
+    - AI-powered operations
+    - cognitive operations
+    - automated remediation
+
+  nlp:
+    - NLP
+    - natural language processing
+    - text analysis
+    - sentiment analysis
+    - named entity recognition
+    - text classification
+
+  computer_vision:
+    - computer vision
+    - image recognition
+    - object detection
+    - OCR
+    - visual monitoring
+
+# 监控相关关键词
+monitoring:
+  tools:
+    - Prometheus
+    - Grafana
+    - Zabbix
+    - Nagios
+    - Datadog
+    - New Relic
+    - ELK Stack
+    - EFK Stack
+    - Jaeger
+    - Zipkin
+    - SkyWalking
+    - Loki
+    - InfluxDB
+    - Thanos
+    - VictoriaMetrics
+
+  concepts:
+    - metrics
+    - monitoring
+    - SLI
+    - SLO
+    - SLA
+    - error budget
+    - golden signals
+    - distributed tracing
+    - log aggregation
+    - observability
+    - time series
+
+  indicators:
+    - CPU
+    - memory
+    - disk
+    - network
+    - latency
+    - throughput
+    - error rate
+    - availability
+
+# 告警相关关键词
+alerting:
+  tools:
+    - Alertmanager
+    - PagerDuty
+    - Opsgenie
+    - VictorOps
+    - CloudWatch Alarms
+
+  concepts:
+    - alerting
+    - alert rules
+    - on-call
+    - runbook
+    - playbook
+    - escalation
+    - alert routing
+    - alert silencing
+    - alert noise
+    - severity
+
+# 自动化相关关键词
+automation:
+  languages:
+    - Python
+    - Go
+    - Shell
+    - Bash
+    - Java
+    - JavaScript
+
+  cicd:
+    - Jenkins
+    - GitLab CI
+    - GitHub Actions
+    - CircleCI
+    - Travis CI
+    - ArgoCD
+    - Spinnaker
+    - Tekton
+
+  iac:
+    - Terraform
+    - Ansible
+    - Puppet
+    - Chef
+    - CloudFormation
+    - Pulumi
+
+  concepts:
+    - automation
+    - CI/CD
+    - infrastructure as code
+    - IaC
+    - deployment
+    - pipeline
+    - scripting
+
+# 容器化和云原生关键词
+containerization:
+  container_runtime:
+    - Docker
+    - containerd
+    - CRI-O
+
+  orchestration:
+    - Kubernetes
+    - K8s
+    - Docker Swarm
+    - Helm
+    - Kustomize
+
+  cloud_native:
+    - microservices
+    - service mesh
+    - Istio
+    - Linkerd
+    - serverless
+    - GitOps
+
+  cloud_platforms:
+    - AWS
+    - GCP
+    - Azure
+    - Aliyun
+    - Alibaba Cloud
+    - Tencent Cloud
+    - Huawei Cloud
+
+  concepts:
+    - containerization
+    - orchestration
+    - cloud native
+    - container
+
+# 故障处理关键词
+incident_handling:
+  tools:
+    - PagerDuty
+    - Opsgenie
+    - StatusPage
+
+  concepts:
+    - incident response
+    - troubleshooting
+    - debugging
+    - root cause analysis
+    - RCA
+    - postmortem
+    - 5-Whys
+    - fishbone diagram
+    - disaster recovery
+    - failover
+    - high availability
+    - HA
+
+  debugging_tools:
+    - strace
+    - tcpdump
+    - perf
+    - eBPF
+    - gdb
+    - pprof
+
+# 数据库和存储关键词
+database:
+  relational:
+    - MySQL
+    - PostgreSQL
+    - MariaDB
+    - Oracle
+    - SQL Server
+
+  nosql:
+    - Redis
+    - MongoDB
+    - Elasticsearch
+    - Cassandra
+    - etcd
+    - Consul
+
+  messaging:
+    - Kafka
+    - RabbitMQ
+    - RocketMQ
+    - NATS
+    - Pulsar
+
+  storage:
+    - S3
+    - MinIO
+    - Ceph
+    - NFS
+    - HDFS
+
+# 网络关键词
+networking:
+  protocols:
+    - HTTP
+    - HTTPS
+    - HTTP/2
+    - gRPC
+    - WebSocket
+    - TCP
+    - UDP
+
+  load_balancers:
+    - Nginx
+    - HAProxy
+    - Envoy
+    - Traefik
+
+  dns:
+    - DNS
+    - BIND
+    - CoreDNS
+    - Route 53
+
+  concepts:
+    - load balancing
+    - DNS
+    - CDN
+    - VPN
+
+# 安全关键词
+security:
+  auth:
+    - OAuth
+    - OpenID Connect
+    - JWT
+    - RBAC
+    - LDAP
+
+  tools:
+    - Vault
+    - Let's Encrypt
+
+  concepts:
+    - security
+    - encryption
+    - authentication
+    - authorization
+    - zero trust
+
+# 版本控制关键词
+version_control:
+  tools:
+    - Git
+    - GitHub
+    - GitLab
+    - Bitbucket
+    - Gitee
+
+  concepts:
+    - version control
+    - pull request
+    - merge request
+    - code review
+    - branching
+
+# 其他关键词
+others:
+  collaboration:
+    - Jira
+    - Confluence
+    - Notion
+    - Slack
+    - Teams
+
+  documentation:
+    - Markdown
+    - documentation
+    - README
+
+# 关键词权重
+keyword_weights:
+  high:  # 高权重 - 表明深度经验
+    - Prometheus
+    - Grafana
+    - Kubernetes
+    - Terraform
+    - CI/CD
+    - automation
+    - monitoring
+    - alerting
+    - incident response
+    - postmortem
+    - RCA
+    - SLI/SLO
+    - LLM
+    - AI Agent
+    - AIOps
+    - intelligent monitoring
+    - anomaly detection
+    - predictive maintenance
+    - Cursor
+    - GitHub Copilot
+
+  medium:  # 中权重 - 表明实际使用
+    - Python
+    - Go
+    - Shell
+    - Jenkins
+    - GitLab CI
+    - Docker
+    - MySQL
+    - Redis
+    - Kafka
+    - Nginx
+    - AWS
+    - Aliyun
+    - machine learning
+    - TensorFlow
+    - PyTorch
+    - time series forecasting
+    - LangChain
+    - prompt engineering
+    - RAG
+
+  low:  # 低权重 - 表明了解
+    - Linux
+    - Git
+    - basic networking
+    - version control
+    - documentation
+    - NLP
+    - computer vision
+    - basic ML concepts
+
+# 技术栈映射
+tech_stack_mapping:
+  monitoring_stack:
+    - Prometheus
+    - Grafana
+    - Alertmanager
+    - Node Exporter
+
+  cicd_stack:
+    - Git
+    - Jenkins/GitLab CI
+    - Docker
+    - Kubernetes
+
+  cloud_native_stack:
+    - Docker
+    - Kubernetes
+    - Helm
+    - Istio
+
+  automation_stack:
+    - Python/Go
+    - Ansible
+    - Terraform
+    - Jenkins

@@ -1,0 +1,247 @@
+# SRE 简历评分标准配置
+# Scoring Criteria Configuration
+
+version: "1.0"
+last_updated: "2026-03-05"
+
+# 评分维度配置
+dimensions:
+  monitoring:
+    name: "监控相关经验"
+    weight: 0.20
+    description: "评估候选人在监控体系设计、部署和使用方面的经验"
+    keywords:
+      high:  # 9-10分关键词
+        - "Prometheus Exporter"
+        - "监控体系设计"
+        - "SLI/SLO"
+        - "分布式追踪"
+        - "大规模监控"
+      medium:  # 7-9分关键词
+        - "Prometheus"
+        - "Grafana"
+        - "监控配置"
+        - "告警规则"
+        - "监控面板"
+      low:  # 4-6分关键词
+        - "Zabbix"
+        - "监控使用"
+        - "基础监控"
+    scoring:
+      excellent:  # 10分
+        range: [9.5, 10.0]
+        description: "从零搭建完整监控体系,开发自定义 Exporter,设计复杂监控指标体系"
+      good:  # 7-9分
+        range: [7.0, 9.4]
+        description: "熟练配置和使用 Prometheus/Grafana,独立创建监控面板和告警规则"
+      fair:  # 4-6分
+        range: [4.0, 6.9]
+        description: "会使用基础监控工具,了解监控基本概念"
+      poor:  # 1-3分
+        range: [1.0, 3.9]
+        description: "仅了解监控概念,无实际操作经验"
+
+  alerting:
+    name: "告警设计能力"
+    weight: 0.15
+    description: "评估候选人在告警体系设计、配置和维护方面的经验"
+    keywords:
+      high:
+        - "告警体系设计"
+        - "On-call"
+        - "告警收敛"
+        - "智能告警"
+        - "Runbook"
+      medium:
+        - "Alertmanager"
+        - "告警规则"
+        - "阈值调优"
+        - "告警分级"
+      low:
+        - "告警处理"
+        - "基础告警"
+    scoring:
+      excellent:
+        range: [9.5, 10.0]
+        description: "设计完整告警体系(分级、收敛、路由),实施 On-call 机制"
+      good:
+        range: [7.0, 9.4]
+        description: "熟练配置 Alertmanager,编写告警规则和阈值调优"
+      fair:
+        range: [4.0, 6.9]
+        description: "处理过告警通知,了解告警基本流程"
+      poor:
+        range: [1.0, 3.9]
+        description: "基本概念了解,无实际经验"
+
+  automation:
+    name: "自动化能力"
+    weight: 0.20
+    description: "评估候选人在自动化脚本编写、CI/CD 和 IaC 方面的经验"
+    keywords:
+      high:
+        - "CI/CD 流水线"
+        - "Terraform"
+        - "自动化平台"
+        - "基础设施即代码"
+        - "IaC"
+      medium:
+        - "Jenkins"
+        - "GitLab CI"
+        - "Ansible"
+        - "Python 脚本"
+        - "Shell 脚本"
+      low:
+        - "简单脚本"
+        - "版本控制"
+        - "Git"
+    scoring:
+      excellent:
+        range: [9.5, 10.0]
+        description: "大型自动化项目经验,设计 CI/CD 流水线,有 IaC 实践"
+      good:
+        range: [7.0, 9.4]
+        description: "日常使用自动化工具,编写运维脚本,维护 CI/CD 流水线"
+      fair:
+        range: [4.0, 6.9]
+        description: "基础编程能力,编写简单自动化脚本"
+      poor:
+        range: [1.0, 3.9]
+        description: "基本编程概念,无实际项目经验"
+
+  containerization:
+    name: "容器化/云原生"
+    weight: 0.15
+    description: "评估候选人在 Docker、Kubernetes 和云平台方面的经验"
+    keywords:
+      high:
+        - "Kubernetes 生产"
+        - "微服务架构"
+        - "Service Mesh"
+        - "Istio"
+        - "大规模容器"
+      medium:
+        - "Docker"
+        - "Kubernetes"
+        - "阿里云"
+        - "AWS"
+        - "容器编排"
+      low:
+        - "Docker 基础"
+        - "云平台使用"
+        - "容器概念"
+    scoring:
+      excellent:
+        range: [9.5, 10.0]
+        description: "Kubernetes 生产环境管理经验,微服务架构设计实施"
+      good:
+        range: [7.0, 9.4]
+        description: "Docker 容器化部署经验,使用 K8s 进行应用部署"
+      fair:
+        range: [4.0, 6.9]
+        description: "Docker 基本操作,了解容器化概念"
+      poor:
+        range: [1.0, 3.9]
+        description: "概念性了解,无实际操作经验"
+
+  incident_handling:
+    name: "故障处理经验"
+    weight: 0.15
+    description: "评估候选人在故障响应、根因分析和系统改进方面的经验"
+    keywords:
+      high:
+        - "Postmortem"
+        - "根因分析"
+        - "RCA"
+        - "故障演练"
+        - "应急预案"
+      medium:
+        - "故障排查"
+        - "故障响应"
+        - "问题定位"
+        - "复盘"
+      low:
+        - "基础排查"
+        - "故障意识"
+    scoring:
+      excellent:
+        range: [9.5, 10.0]
+        description: "主导过重大故障处理,有 RCA 和 Postmortem 经验"
+      good:
+        range: [7.0, 9.4]
+        description: "参与过故障响应和排查,有基本故障定位能力"
+      fair:
+        range: [4.0, 6.9]
+        description: "了解故障处理流程,参与过简单故障处理"
+      poor:
+        range: [1.0, 3.9]
+        description: "有基本意识,无实际经验"
+
+  resume_quality:
+    name: "简历整体质量"
+    weight: 0.15
+    description: "评估简历的结构、表达、量化程度和专业性"
+    criteria:
+      structure: "结构清晰,逻辑严谨"
+      star_principle: "项目描述使用 STAR 原则"
+      quantification: "量化成果,数据详实"
+      technical_accuracy: "技术栈表述准确"
+      professionalism: "语言专业简洁"
+      readability: "排版美观易读"
+    scoring:
+      excellent:
+        range: [9.5, 10.0]
+        description: "专业水准,可直接投递,无需修改"
+      good:
+        range: [7.0, 9.4]
+        description: "良好水平,小修改即可投递"
+      fair:
+        range: [4.0, 6.9]
+        description: "一般水平,需要较大修改"
+      poor:
+        range: [1.0, 3.9]
+        description: "需大幅改进"
+
+# 等级划分
+grades:
+  A:
+    range: [8.5, 10.0]
+    label: "优秀"
+    description: "简历质量优秀,可直接投递"
+    recommendation: "保持优势,持续提升"
+  B:
+    range: [7.0, 8.4]
+    label: "良好"
+    description: "简历质量良好,小幅优化即可"
+    recommendation: "针对性改进薄弱项"
+  C:
+    range: [5.5, 6.9]
+    label: "中等"
+    description: "简历质量中等,需要较大优化"
+    recommendation: "重点关注高优先级改进项"
+  D:
+    range: [4.0, 5.4]
+    label: "需改进"
+    description: "简历质量一般,需要大幅优化"
+    recommendation: "建议全面重构简历"
+  F:
+    range: [0.0, 3.9]
+    label: "需大幅改进"
+    description: "简历质量较差,建议重新准备"
+    recommendation: "从零开始重新编写"
+
+# 百分位估算
+percentiles:
+  top_10: 8.5
+  top_30: 7.0
+  top_50: 6.0
+  top_70: 5.0
+  top_90: 4.0
+
+# 评分约束
+constraints:
+  min_score: 1.0
+  max_score: 10.0
+  score_precision: 1  # 保留1位小数
+  require_evidence: true  # 所有评分必须有证据支撑
+  evidence_min_count: 2  # 每个维度至少需要2条证据

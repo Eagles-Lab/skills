@@ -1,0 +1,83 @@
+{
+  "dimensions": {
+    "monitoring": {
+      "weight": 0.20,
+      "name": "监控相关经验",
+      "excellent": [9.5, 10.0],
+      "good": [7.0, 9.4],
+      "fair": [4.0, 6.9],
+      "poor": [1.0, 3.9]
+    },
+    "alerting": {
+      "weight": 0.15,
+      "name": "告警设计能力",
+      "excellent": [9.5, 10.0],
+      "good": [7.0, 9.4],
+      "fair": [4.0, 6.9],
+      "poor": [1.0, 3.9]
+    },
+    "automation": {
+      "weight": 0.20,
+      "name": "自动化能力",
+      "excellent": [9.5, 10.0],
+      "good": [7.0, 9.4],
+      "fair": [4.0, 6.9],
+      "poor": [1.0, 3.9]
+    },
+    "containerization": {
+      "weight": 0.15,
+      "name": "容器化/云原生",
+      "excellent": [9.5, 10.0],
+      "good": [7.0, 9.4],
+      "fair": [4.0, 6.9],
+      "poor": [1.0, 3.9]
+    },
+    "incident_handling": {
+      "weight": 0.15,
+      "name": "故障处理经验",
+      "excellent": [9.5, 10.0],
+      "good": [7.0, 9.4],
+      "fair": [4.0, 6.9],
+      "poor": [1.0, 3.9]
+    },
+    "resume_quality": {
+      "weight": 0.15,
+      "name": "简历整体质量",
+      "excellent": [9.5, 10.0],
+      "good": [7.0, 9.4],
+      "fair": [4.0, 6.9],
+      "poor": [1.0, 3.9]
+    }
+  },
+  "ai_bonus": {
+    "max_score": 1.5,
+    "categories": {
+      "llm": "LLM/GPT/Claude/RAG/LangChain 等大模型应用",
+      "ai_agents": "AI Agent/智能运维Agent/自动化Agent",
+      "ai_ide": "Cursor/GitHub Copilot/AI辅助编程",
+      "ml_ops": "异常检测/时序预测/机器学习运维",
+      "aiops": "AIOps/智能监控/预测性维护"
+    },
+    "scoring": {
+      "+1.5": "3+个不同类别的AI深度应用,有量化成果",
+      "+1.0": "2个类别的AI应用,有具体场景",
+      "+0.5": "1个类别的AI应用,有实际使用"
+    }
+  },
+  "grade_thresholds": {
+    "A+": {"range": [9.5, 11.5], "label": "卓越", "description": "突出 AI 技术应用"},
+    "A": {"range": [8.5, 9.4], "label": "优秀", "description": "可直接投递"},
+    "B": {"range": [7.0, 8.4], "label": "良好", "description": "小幅优化即可"},
+    "C": {"range": [5.5, 6.9], "label": "中等", "description": "需要较大优化"},
+    "D": {"range": [4.0, 5.4], "label": "需改进", "description": "需大幅优化"},
+    "F": {"range": [0.0, 3.9], "label": "需大幅改进", "description": "建议重新准备"}
+  },
+  "constraints": {
+    "min_score": 1.0,
+    "max_base_score": 10.0,
+    "max_total_score": 11.5,
+    "score_precision": 1,
+    "require_evidence": true,
+    "evidence_min_count": 2
+  }
+}
