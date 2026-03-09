@@ -30,9 +30,10 @@ description: |
 
 ## Metadata
 
-- **Version**: 2.1.0
-- **Description**: 分析和评估 SRE (Site Reliability Engineer) 岗位简历,基于 "6+1" 评分体系进行多维度评估
+- **Version**: 2.2.0
+- **Description**: 分析和评估 SRE (Site Reliability Engineer) 岗位简历,基于 "6+1" 评分体系进行多维度评估,生成个性化面试题
 - **Created**: 2026-03-05
+- **Last Updated**: 2026-03-09
 - **Target**: 2027届本科/硕士毕业生
 - **Target Roles**: SRE 工程师、运维工程师、DevOps 工程师、AIOps 工程师
 
@@ -93,12 +94,13 @@ description: |
 
 ### 输出文件清单
 
-每份简历生成 4 个文件:
+每份简历生成 5 个文件:
 
 1. `extracted.json` - 结构化数据(基本信息、项目、技能)
 2. `score.json` - 详细评分(6+1 维度得分、证据、等级)
 3. `analysis.json` - 优势、劣势、亮点、问题
 4. `suggestions.md` - 优化建议(按优先级分类)
+5. `interview_questions.md` - 面试题(基于简历内容的个性化题目)
 
 ### 高权重关键词 (9-10分级别)
 
@@ -160,6 +162,16 @@ Skill(skill="document-skills:pdf", args="extract text from {pdf_path}")
     "graduation_year": "number",
     "contact": { "phone": "string", "email": "string" }
   },
+  "internships": [
+    {
+      "company": "string",
+      "role": "string",
+      "duration": "string",
+      "description": "string",
+      "tech_stack": ["string"],
+      "achievements": ["string"]
+    }
+  ],
   "projects": [
     {
       "name": "string",
@@ -212,22 +224,103 @@ Skill(skill="document-skills:pdf", args="extract text from {pdf_path}")
 
 **模板文件**: `templates/suggestions_template.md`
 
-### Step 5: 输出文件
+### Step 5: 生成面试题
+
+基于 `extracted.json` 中的 internships、projects、skills 三个字段，生成个性化面试题。
+
+**生成原则**:
+
+1. **数量控制**: 总共 10 题以内
+2. **优先级策略**:
+   - 如果有实习经历，优先针对实习项目生成 3-4 题
+   - 如果有项目经历，针对项目生成 3-4 题
+   - 针对技能列表生成 2-3 题验证题
+3. **题目类型**: 混合类型
+   - 技术深度题（考察理解深度）
+   - 项目经验题（考察实战能力）
+   - 技能验证题（考察基础知识）
+4. **适应性**: 如果学生缺少实习或项目，则重点考察技能掌握情况和课程项目
+
+**题目示例**:
+
+- **实习类**: "你在 XX 公司实习期间，提到使用了 Prometheus 监控系统。能详细说说你们是如何设计告警规则的？遇到过哪些挑战？"
+- **项目类**: "在你的 XX 项目中，你负责容器化部署。能解释一下你们是如何处理配置管理的？用了哪些最佳实践？"
+- **技能类**: "你提到熟悉 Kubernetes，能说说 Pod 的生命周期吗？如何实现零停机部署？"
+
+**输出模板**: `templates/interview_questions_template.md`
+
+### Step 6: 输出文件
 
 **目录结构**:
 
 ```
 processing/{resume_id}/
-├── extracted.json    # 结构化数据
-├── score.json        # 评分详情
-├── analysis.json     # 分析结果
-└── suggestions.md    # 优化建议
+├── extracted.json         # 结构化数据
+├── score.json             # 评分详情
+├── analysis.json          # 分析结果
+├── suggestions.md         # 优化建议
+└── interview_questions.md # 面试题
 ```
 
 **文件命名规范**:
 
 - resume*id: `{姓名}*{学校}_{专业}_{批次}`
 - 例如: `张三_北京大学_计算机_27届云计算`
+
+---
+
+## 面试题生成指南
+
+### 题目生成策略
+
+**基于简历内容的动态分配**:
+
+1. **有实习 + 有项目 + 有技能**: 实习 3 题 + 项目 4 题 + 技能 3 题
+2. **无实习 + 有项目 + 有技能**: 项目 6 题 + 技能 4 题
+3. **无实习 + 无项目 + 有技能**: 技能 10 题（深入考察基础）
+4. **有实习 + 无项目 + 有技能**: 实习 5 题 + 技能 5 题
+
+### 题目类型分布
+
+**实习类题目** (针对 internships):
+- 30% 技术深度题（工具/平台的使用细节）
+- 40% 问题解决题（遇到的挑战和解决方案）
+- 30% 团队协作题（跨部门合作、沟通能力）
+
+**项目类题目** (针对 projects):
+- 40% 架构设计题（技术选型、系统设计）
+- 40% 实施细节题（具体实现、遇到的坑）
+- 20% 优化改进题（性能优化、可扩展性）
+
+**技能类题目** (针对 skills):
+- 50% 基础概念题（原理、机制）
+- 30% 应用场景题（何时使用、最佳实践）
+- 20% 对比分析题（工具选型、技术对比）
+
+### 题目质量标准
+
+✅ **好题目示例**:
+- "你在项目中提到使用了 Docker 和 Kubernetes。能说说你们是如何处理容器镜像版本管理的？在生产环境中如何保证镜像的安全性？"
+- "你提到熟悉 Prometheus，能解释一下它的数据模型吗？在监控微服务时，你们是如何设计指标标签的？遇到过什么性能问题？"
+
+❌ **避免的题目**:
+- 过于宽泛：说说你做过什么项目？
+- 过于简单：Docker 是什么？
+- 脱离简历：你对微服务架构怎么看？（未提及）
+
+### 题目生成流程
+
+1. **读取 extracted.json** 的三个字段
+2. **分析内容密度**：
+   - 统计实习数量和质量
+   - 统计项目数量和技术栈
+   - 统计技能列表的广度和深度
+3. **应用分配策略**：根据内容情况选择合适的题目配比
+4. **生成具体题目**：
+   - 提取关键信息（技术栈、成就、工具）
+   - 结合 SRE 核心能力设计问题
+   - 确保题目有深度和区分度
+5. **格式化输出**：使用模板生成 Markdown 文件
 
 ---
 
@@ -411,6 +504,13 @@ grade_thresholds:
 ---
 
 ## Changelog
+
+### v2.2.0 (2026-03-09)
+
+- 新增面试题生成功能
+- 新增 `interview_questions.md` 输出文件
+- 添加面试题生成指南（题目类型、分配策略、质量标准）
+- 更新工作流程为 6 步
 
 ### v2.1.0 (2026-03-05)
 
