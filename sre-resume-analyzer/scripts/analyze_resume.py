@@ -307,11 +307,6 @@ class ResumeAnalyzer:
             raise
 
 
-class ResumeAnalyzerError(Exception):
-    """简历分析错误"""
-    pass
-
-
 def main():
     """主函数"""
     parser = argparse.ArgumentParser(description="SRE 简历分析工具")

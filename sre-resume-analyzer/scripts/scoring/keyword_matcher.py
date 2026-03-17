@@ -11,6 +11,13 @@ import re
 from pathlib import Path
 from typing import Dict, List, Tuple, Set
 from collections import defaultdict
+import sys
+
+# 添加父目录到系统路径
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+from config.config_manager import ConfigManager
+from config.dimension_constants import SCORING_DIMENSIONS, KEYWORD_WEIGHTS
 
 
 class KeywordMatcher:
@@ -80,8 +87,7 @@ class KeywordMatcher:
         result["categories"]["ai"] = self._match_ai_keywords(text, case_sensitive)
 
         # 匹配各维度关键词
-        dimensions = ["monitoring", "alerting", "automation", "containerization", "incident_handling"]
-        for dimension in dimensions:
+        for dimension in SCORING_DIMENSIONS:
             matches = self._match_dimension_keywords(text, dimension, case_sensitive)
             result["dimension_keywords"][dimension] = matches
             if matches["keywords"]:
@@ -95,7 +101,7 @@ class KeywordMatcher:
                 ])
 
         # 匹配权重关键词
-        for weight in ["high", "medium", "low"]:
+        for weight in KEYWORD_WEIGHTS:
             weight_keywords = self.keywords_config.get("keyword_weights", {}).get(weight, [])
             matches = self._match_keyword_list(text, weight_keywords, case_sensitive)
             result["weighted_keywords"][weight] = matches
