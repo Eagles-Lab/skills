@@ -39,7 +39,7 @@ description: |
 
 ### Prerequisites
 
-- PDF 处理: pdfplumber (v0.11.9) 或 document-skills:pdf skill
+- PDF 处理:  document-skills:pdf skill 或 pdfplumber Python 库
 - Python 环境: venv (`.venv/bin/python3`)
 - 配置文件: `config/sre_keywords.yaml` (唯一数据源，位于 skill 目录)
 - 生成脚本: `scripts/generate_keyword_docs.py` (按需生成文档)

@@ -10,18 +10,28 @@
 
 ### sre-resume-analyzer
 
-SRE 简历分析与评估工具，基于"6+1"评分体系（6个技术维度 + AI 加分）。
+SRE 简历自动化分析工具（v2.3.0），基于"6+1"评分体系。
 
 **核心功能**：
-- PDF 简历结构化数据提取
-- 六维评分：监控、告警、自动化、容器化、故障处理、简历质量
-- AI 技术加分评估（最高 +1.5 分）
-- 个性化面试题生成（10 题以内，基于简历内容）
-- 生成 5 个文件：extracted.json、score.json、analysis.json、suggestions.md、interview_questions.md
+- 完全自动化的评分系统（6 维度 + AI 加分）
+- 个性化面试题生成
+- 批量处理支持（并发）
+- 生产级代码质量
 
-**适用场景**：分析 SRE/DevOps/运维工程师简历，提供评分和优化建议
+**使用方式**：
+```bash
+# 单个简历
+venv/bin/python3 sre-resume-analyzer/scripts/analyze_resume.py \
+  --extracted resume_extracted.json
 
-**详细文档**：`sre-resume-analyzer/SKILL.md`
+# 批量处理
+venv/bin/python3 sre-resume-analyzer/scripts/batch_processor.py \
+  --input-dir ./resumes --parallel 3
+```
+
+**详细文档**：`sre-resume-analyzer/README.md`
+
+---
 
 ## 常用命令
 
@@ -37,46 +47,67 @@ Skill(skill="document-skills:pdf", args="extract text from {pdf_path}")
 venv/bin/python3 sre-resume-analyzer/scripts/extract_pdf.py "{pdf_path}"
 ```
 
+### 简历分析
+
+```bash
+# 完整分析流程（生成 5 个文件）
+venv/bin/python3 sre-resume-analyzer/scripts/analyze_resume.py \
+  --extracted resume_extracted.json \
+  --output ./processing
+
+# 批量处理
+venv/bin/python3 sre-resume-analyzer/scripts/batch_processor.py \
+  --input-dir ./resumes \
+  --output-dir ./processing \
+  --parallel 3
+```
+
+### 测试
+
+```bash
+venv/bin/python3 sre-resume-analyzer/tests/run_tests.py
+```
+
 ### 从 YAML 生成文档
 
-更新 `config/sre_keywords.yaml` 后，重新生成人类可读文档：
 ```bash
 venv/bin/python3 sre-resume-analyzer/scripts/generate_keyword_docs.py
 ```
 
-生成文件：
-- `references/sre_keywords.md` - 关键词列表
-- `config/keywords_core.json` - 核心关键词 JSON
+---
 
 ## Python 环境
 
 **重要**：使用父目录共享虚拟环境 `../venv/`
 
 所有 Python 命令必须使用 venv：
-- 执行脚本：`venv/bin/python3 script.py`
-- 运行代码：`venv/bin/python3 << 'EOF' ... EOF`
-- 安装包：`venv/bin/pip install package_name`
+```bash
+venv/bin/python3 script.py
+venv/bin/pip install package_name
+```
 
-完整规范见 `../CLAUDE.md`
+---
 
 ## 评分体系
 
 ### "6+1" 维度
 
 **基础分**（1.0-10.0）：
-- 监控经验 (20%) | 告警设计 (15%) | 自动化能力 (20%)
-- 容器化 (15%) | 故障处理 (15%) | 简历质量 (15%)
+- 监控经验 20% | 告警设计 15% | 自动化能力 20%
+- 容器化 15% | 故障处理 15% | 简历质量 15%
 
 **AI 加分**（+0 ~ +1.5）：
-- +1.5：3+ 个 AI 类别的深度应用，有量化成果
-- +1.0：2 个 AI 类别的应用，有量化成果
-- +0.5：1 个 AI 类别的实际应用
+- +1.5：3+ 个 AI 类别深度应用 + 量化成果
+- +1.0：2 个 AI 类别应用 + 量化成果
+- +0.5：1 个 AI 类别实际应用
 
-**AI 类别**：LLM 应用、AI Agent、AI IDE (Cursor/Copilot)、ML Ops、AIOps
+**等级阈值**：
+- A+: 9.5-11.5 | A: 8.5-9.4 | B: 7.0-8.4
+- C: 5.5-6.9 | D: 4.0-5.4 | F: <4.0
 
-### 等级阈值
+**详细说明**：`sre-resume-analyzer/docs/scoring_system.md`
 
-A+: 9.5-11.5 | A: 8.5-9.4 | B: 7.0-8.4 | C: 5.5-6.9 | D: 4.0-5.4 | F: <4.0
+---
 
 ## 架构要点
 
@@ -85,9 +116,6 @@ A+: 9.5-11.5 | A: 8.5-9.4 | B: 7.0-8.4 | C: 5.5-6.9 | D: 4.0-5.4 | F: <4.0
 `config/sre_keywords.yaml` 是唯一数据源：
 - 300+ SRE 技术关键词
 - 关键词权重（高/中/低）
-- 技术栈映射
-
-其他文件（MD/JSON）从 YAML 生成，仅供人类查看。
 
 ### 配置分离
 
@@ -98,39 +126,33 @@ A+: 9.5-11.5 | A: 8.5-9.4 | B: 7.0-8.4 | C: 5.5-6.9 | D: 4.0-5.4 | F: <4.0
 ### 输出结构
 
 每个简历生成独立目录：`processing/{resume_id}/`
-- `extracted.json` - 结构化数据
-- `score.json` - 评分详情（含证据）
-- `analysis.json` - 优劣分析
-- `suggestions.md` - 优化建议
-- `interview_questions.md` - 个性化面试题（基于实习、项目、技能）
+```
+processing/{resume_id}/
+├── extracted.json         # 结构化数据
+├── score.json             # 评分详情（含证据）
+├── analysis.json          # 优劣分析
+├── suggestions.md         # 优化建议
+└── interview_questions.md # 面试题
+```
 
-### 模板驱动
-
-`suggestions.md` 基于 `templates/suggestions_template.md` 生成，使用占位符确保格式一致。
+---
 
 ## 工作要点
 
-### 技能触发
-
-技能自动识别 SRE/DevOps/运维简历并执行：
-1. PDF 文本提取
-2. 结构化数据解析（基本信息、实习、项目、技能）
-3. 六维评分（6+1 体系）
-4. 生成分析和建议
-5. **生成个性化面试题**（根据简历内容动态生成 10 题以内）
-
 ### 评分原则
 
-- **证据驱动**：每个评分必须有简历中的具体证据
+- **证据驱动**：每个评分必须有具体证据
 - **一致性**：同质量简历应得相近分数
-- **学生友好**：考虑学生经验有限（实习、课程项目有价值）
+- **学生友好**：实习、课程项目有价值
 - **最少证据**：每个维度至少 2 个证据项
 
 ### PDF 处理
 
-- 必须使用 pdfplumber 或 document-skills:pdf（不要用 Read 工具直接读 PDF）
-- 检查提取质量，特别是多栏布局和表格
+- 优先使用 `document-skills:pdf`
+- 检查提取质量（多栏布局、表格）
 - 验证联系方式和量化数据完整性
+
+---
 
 ## 更新技能
 
@@ -139,15 +161,42 @@ A+: 9.5-11.5 | A: 8.5-9.4 | B: 7.0-8.4 | C: 5.5-6.9 | D: 4.0-5.4 | F: <4.0
 1. 编辑 `config/sre_keywords.yaml`
 2. 生成文档：`venv/bin/python3 scripts/generate_keyword_docs.py`
 3. 测试简历分析
-4. 只提交 YAML 文件（MD/JSON 已被 gitignore）
 
 ### 调整权重
 
-1. 修改 `config/scoring_weights.json`（维度权重）
-2. 修改 `config/scoring_criteria.yaml`（详细标准）
-3. 用现有简历测试一致性
-4. 在 SKILL.md 记录变更
+1. 修改 `config/scoring_weights.json`
+2. 用现有简历测试一致性
 
-### 更新模板
+---
 
-修改 `templates/suggestions_template.md` 改变输出格式，保持占位符与 JSON 结构一致。
+## v2.3.0 新特性
+
+### 完全自动化
+
+- ✅ 无需 Claude Agent 手动执行
+- ✅ 独立的 Python 脚本
+- ✅ 批量处理支持（并发）
+- ✅ 完整错误处理和日志
+- ✅ 测试覆盖（单元 + 集成）
+
+### 新增文件
+
+**核心脚本**：
+- `scripts/scoring/` - 评分系统（keyword_matcher, score_calculator, ai_bonus_evaluator）
+- `scripts/generators/` - 生成器（interview_generator, suggestions_generator）
+- `scripts/analyze_resume.py` - 主流程入口
+- `scripts/batch_processor.py` - 批量处理
+
+**配置和测试**：
+- `config/config_manager.py` - 统一配置管理
+- `tests/` - 完整测试体系
+
+**文档**：
+- `docs/user_guide.md` - 用户指南
+- `docs/scoring_system.md` - 评分体系详解
+- `IMPLEMENTATION_REPORT.md` - 完整实施报告
+
+### 完整实施报告
+
+查看 `sre-resume-analyzer/IMPLEMENTATION_REPORT.md` 了解 v2.3.0 的详细优化内容。
+
