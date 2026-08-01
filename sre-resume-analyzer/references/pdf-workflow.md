@@ -10,12 +10,11 @@ platform. Discover it at runtime; do not assume a named skill, plugin, command,
 or installation path exists.
 
 Use `extract-resume-text` only for text-based local PDFs when a platform reader
-is unavailable or a deterministic raw artifact is required. The locked local
-PDF dependency is installed on Python 3.10+; use the platform PDF capability
-or a newer Python environment when the analyzer core runs on Python 3.9:
+is unavailable or a deterministic raw artifact is required. Run it through uv
+so the pinned Python 3.13.13 interpreter and locked dependencies are used:
 
 ```bash
-extract-resume-text ./resume.pdf --output ./raw_extraction.json
+uv run --frozen extract-resume-text ./resume.pdf --output ./raw_extraction.json
 ```
 
 The command extracts raw pages and tables. It does not infer canonical resume
@@ -93,7 +92,7 @@ the raw extraction artifact or pass it directly to the analyzer.
 After validation, run:
 
 ```bash
-analyze-resume --extracted ./resume.json --output-dir ./processing
+uv run --frozen analyze-resume --extracted ./resume.json --output-dir ./processing
 ```
 
 Verify the five-file atomic bundle and remove raw extraction when it is no

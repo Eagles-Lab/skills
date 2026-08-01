@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -21,7 +21,7 @@ AnalyzerFactory = Callable[[Path], ResumeAnalyzer]
 
 
 def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class BatchProcessor:
@@ -156,7 +156,7 @@ class BatchProcessor:
         for item in successful:
             grade = str(item["grade"])
             grade_distribution[grade] = grade_distribution.get(grade, 0) + 1
-        generated_at = self.clock().astimezone(timezone.utc).replace(microsecond=0).isoformat()
+        generated_at = self.clock().astimezone(UTC).replace(microsecond=0).isoformat()
         return {
             "generated_at": generated_at.replace("+00:00", "Z"),
             "total": len(results),

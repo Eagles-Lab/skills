@@ -30,23 +30,20 @@ canonical fields. Scanned PDFs require an external OCR-capable tool.
 
 ## Install
 
-Python 3.9, 3.11, and 3.13 are supported for canonical validation, scoring,
-reporting, batching, and calibration. The optional local `pdfplumber` fallback
-is installed only on Python 3.10+ so supported Python 3.9 environments do not
-pull a PDF dependency chain with known unresolved vulnerabilities. Agent PDF
-extraction remains the primary PDF path on every platform.
+The project uses uv and pins Python 3.13.13 in `.python-version` and
+`pyproject.toml`. Do not run it with a system Python or a different interpreter.
+Agent PDF extraction remains the primary PDF path on every platform.
 
 ```bash
 cd sre-resume-analyzer
-python -m venv .venv
-. .venv/bin/activate
-python -m pip install -e .
+uv python install
+uv sync --frozen
 ```
 
 For development:
 
 ```bash
-python -m pip install -e '.[dev]'
+uv sync --frozen --extra dev
 ```
 
 ## Analyze one canonical resume
@@ -55,7 +52,7 @@ Prepare schema 3.0 JSON according to
 [`references/schema.md`](references/schema.md), then run:
 
 ```bash
-analyze-resume \
+uv run --frozen analyze-resume \
   --extracted ./resume.json \
   --output-dir ./processing
 ```
@@ -67,7 +64,7 @@ hash. Existing output is an error unless `--overwrite` is explicit.
 Optional controls:
 
 ```bash
-analyze-resume \
+uv run --frozen analyze-resume \
   --extracted ./resume.json \
   --output-dir ./processing \
   --seed review-2026-08 \
@@ -85,7 +82,7 @@ Prefer the PDF capability available to the current agent platform. For local,
 text-based PDFs only:
 
 ```bash
-extract-resume-text ./resume.pdf --output ./raw_extraction.json
+uv run --frozen extract-resume-text ./resume.pdf --output ./raw_extraction.json
 ```
 
 Review extraction quality, then map explicit content to canonical JSON. Never
@@ -97,7 +94,7 @@ rename raw extraction output to `extracted.json` or pass it directly to
 Place only canonical v3 JSON files in the input directory:
 
 ```bash
-batch-analyze \
+uv run --frozen batch-analyze \
   --input-dir ./resumes \
   --output-dir ./processing \
   --parallel 3
@@ -173,7 +170,7 @@ not part of this repository. Run the calibration command only against an
 access-controlled dataset:
 
 ```bash
-calibrate-scoring \
+uv run --frozen calibrate-scoring \
   --resumes ./calibration-private/resumes \
   --reviews ./calibration-private/reviews.csv \
   --output-dir ./calibration-private/report

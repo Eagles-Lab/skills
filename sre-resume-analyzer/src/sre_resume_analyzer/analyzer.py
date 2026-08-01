@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, Mapping, Optional
 
@@ -22,7 +22,7 @@ Clock = Callable[[], datetime]
 
 
 def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _validation_summary(error: ValidationError) -> str:
@@ -102,7 +102,7 @@ class ResumeAnalyzer:
         seed: Optional[str] = None,
     ) -> Dict[str, str]:
         resume, input_sha256, resume_id = self.inspect_input(extracted_path)
-        generated_at = self.clock().astimezone(timezone.utc).replace(microsecond=0).isoformat()
+        generated_at = self.clock().astimezone(UTC).replace(microsecond=0).isoformat()
         generated_at = generated_at.replace("+00:00", "Z")
         warnings = (
             [SECURITY_WARNING]

@@ -141,7 +141,9 @@ def weighted_kappa(first: Sequence[float], second: Sequence[float]) -> float:
     if len(values) == 1:
         return 1.0
     span = values[-1] - values[0]
-    observed = sum(((float(a) - float(b)) / span) ** 2 for a, b in zip(first, second)) / len(first)
+    observed = sum(
+        ((float(a) - float(b)) / span) ** 2 for a, b in zip(first, second, strict=True)
+    ) / len(first)
     first_counts = {
         value: sum(float(item) == value for item in first) / len(first) for value in values
     }
@@ -167,7 +169,9 @@ def spearman_correlation(first: Sequence[float], second: Sequence[float]) -> flo
     second_ranks = _average_ranks(second)
     first_mean = statistics.fmean(first_ranks)
     second_mean = statistics.fmean(second_ranks)
-    numerator = sum((a - first_mean) * (b - second_mean) for a, b in zip(first_ranks, second_ranks))
+    numerator = sum(
+        (a - first_mean) * (b - second_mean) for a, b in zip(first_ranks, second_ranks, strict=True)
+    )
     first_norm = math.sqrt(sum((item - first_mean) ** 2 for item in first_ranks))
     second_norm = math.sqrt(sum((item - second_mean) ** 2 for item in second_ranks))
     if first_norm == 0.0 or second_norm == 0.0:
@@ -180,14 +184,16 @@ def median_absolute_error(expected: Sequence[float], actual: Sequence[float]) ->
         raise CalibrationError(
             "median_absolute_error requires two non-empty, equal-length sequences"
         )
-    return float(statistics.median(abs(float(a) - float(b)) for a, b in zip(expected, actual)))
+    return float(
+        statistics.median(abs(float(a) - float(b)) for a, b in zip(expected, actual, strict=True))
+    )
 
 
 def grade_confusion(expected: Sequence[str], actual: Sequence[str]) -> Dict[str, Dict[str, int]]:
     if len(expected) != len(actual):
         raise CalibrationError("grade_confusion requires equal-length sequences")
     matrix = {grade: {candidate: 0 for candidate in GRADES} for grade in GRADES}
-    for expected_grade, actual_grade in zip(expected, actual):
+    for expected_grade, actual_grade in zip(expected, actual, strict=True):
         if expected_grade not in matrix or actual_grade not in matrix[expected_grade]:
             raise CalibrationError("unknown grade in confusion matrix")
         matrix[expected_grade][actual_grade] += 1
@@ -292,7 +298,7 @@ class CalibrationEvaluator:
         spearman = spearman_correlation(human_totals, tool_totals)
         median_error = median_absolute_error(human_totals, tool_totals)
         agreement = sum(
-            expected == actual for expected, actual in zip(human_grades, tool_grades)
+            expected == actual for expected, actual in zip(human_grades, tool_grades, strict=True)
         ) / len(human_grades)
         group_errors = _group_errors(sample_errors, metadata or {})
 

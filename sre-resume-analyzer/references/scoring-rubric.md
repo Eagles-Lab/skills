@@ -153,7 +153,7 @@ incident_handling,resume_quality,ai_bonus,overall_grade,notes
 Run:
 
 ```bash
-calibrate-scoring \
+uv run --frozen calibrate-scoring \
   --resumes ./calibration-private/resumes \
   --reviews ./calibration-private/reviews.csv \
   --output-dir ./calibration-private/report

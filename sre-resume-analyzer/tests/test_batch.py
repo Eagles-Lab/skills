@@ -1,6 +1,6 @@
 import json
 import shutil
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -9,7 +9,7 @@ from sre_resume_analyzer.analyzer import ResumeAnalyzer
 from sre_resume_analyzer.batch import BatchPreflightError, BatchProcessor
 
 FIXTURES = Path(__file__).parent / "fixtures"
-FIXED_TIME = datetime(2026, 8, 2, tzinfo=timezone.utc)
+FIXED_TIME = datetime(2026, 8, 2, tzinfo=UTC)
 
 
 class FakeCalculator:

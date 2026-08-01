@@ -20,12 +20,8 @@ permissions:
 
 jobs:
   python-quality:
-    name: Python ${{ matrix.python-version }}
+    name: Python 3.13.13
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.9", "3.11", "3.13"]
     defaults:
       run:
         working-directory: sre-resume-analyzer
@@ -33,32 +29,30 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-
       - name: Set up uv
         uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
           cache-dependency-glob: sre-resume-analyzer/uv.lock
 
+      - name: Install the pinned Python
+        run: uv python install
+
       - name: Install locked package and development tools
-        run: uv sync --frozen --extra dev --python '${{ matrix.python-version }}'
+        run: uv sync --frozen --extra dev
 
       - name: Check formatting
-        run: uv run ruff format --check .
+        run: uv run --frozen ruff format --check .
 
       - name: Lint
-        run: uv run ruff check .
+        run: uv run --frozen ruff check .
 
       - name: Type check
-        run: uv run mypy src
+        run: uv run --frozen mypy src
 
       - name: Test with coverage gate
         run: >-
-          uv run pytest
+          uv run --frozen pytest
           --cov=sre_resume_analyzer
           --cov-report=term-missing
           --cov-report=xml
@@ -66,7 +60,7 @@ jobs:
           --cov-fail-under=85
 
       - name: Enforce critical-module coverage
-        run: uv run python scripts/check_coverage_gates.py coverage.json
+        run: uv run --frozen python scripts/check_coverage_gates.py coverage.json
 
       - name: Audit installed dependencies
         run: |
@@ -77,22 +71,20 @@ jobs:
             --no-emit-project \
             --format requirements-txt \
             --output-file runtime-requirements.txt
-          uv run pip-audit \
+          uv run --frozen pip-audit \
             --disable-pip \
             --no-deps \
             --requirement runtime-requirements.txt
 
       - name: Static security scan
-        if: matrix.python-version == '3.11'
-        run: uv run bandit -q -r src -ll
+        run: uv run --frozen bandit -q -r src -ll
 
       - name: Build wheel and verify a clean CLI install
-        if: matrix.python-version == '3.11'
         shell: bash
         run: |
           wheel_root="$RUNNER_TEMP/sre-resume-wheel"
           uv build --wheel --out-dir "$wheel_root/dist"
-          uv venv --python '${{ matrix.python-version }}' "$wheel_root/venv"
+          uv venv --python 3.13.13 "$wheel_root/venv"
           wheel_path="$(find "$wheel_root/dist" -name '*.whl' -print -quit)"
           uv pip install --python "$wheel_root/venv/bin/python" "$wheel_path"
           "$wheel_root/venv/bin/analyze-resume" --help >/dev/null
@@ -111,13 +103,11 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
 
-      - name: Install validator dependency
-        run: python -m pip install 'PyYAML>=6,<7'
+      - name: Install the pinned Python
+        run: uv python install 3.13.13
 
       - name: Check out pinned OpenAI skill validator
         uses: actions/checkout@v4
@@ -128,6 +118,7 @@ jobs:
 
       - name: Validate skill structure
         run: >-
+          uv run --isolated --no-project --python 3.13.13 --with 'PyYAML>=6,<7'
           python
           .ci/openai-skills/skills/.system/skill-creator/scripts/quick_validate.py
           sre-resume-analyzer
@@ -135,7 +126,7 @@ jobs:
       - name: Validate local Markdown links
         shell: bash
         run: |
-          python - <<'PY'
+          uv run --isolated --no-project --python 3.13.13 python - <<'PY'
           from pathlib import Path
           import re
           from urllib.parse import unquote

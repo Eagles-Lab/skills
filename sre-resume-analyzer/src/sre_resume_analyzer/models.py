@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Annotated, Dict, List, Literal, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
@@ -89,7 +89,7 @@ class Resume(StrictModel):
     skills: Skills
 
 
-class EvidenceLevel(str, Enum):
+class EvidenceLevel(StrEnum):
     mention = "mention"
     usage = "usage"
     implementation = "implementation"

@@ -1,7 +1,7 @@
 """Determinism and concurrency gates that exercise production-sized batches."""
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from sre_resume_analyzer.analyzer import ResumeAnalyzer
@@ -9,7 +9,7 @@ from sre_resume_analyzer.batch import BatchProcessor
 from sre_resume_analyzer.output import OUTPUT_FILENAMES
 
 FIXTURES = Path(__file__).parent / "fixtures"
-FIXED_TIME = datetime(2026, 8, 2, tzinfo=timezone.utc)
+FIXED_TIME = datetime(2026, 8, 2, tzinfo=UTC)
 
 
 def _fixed_analyzer(root):

@@ -7,10 +7,10 @@ name = "sre-resume-analyzer"
 version = "3.0.0rc1"
 description = "Experimental deterministic SRE resume evidence analyzer"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = "==3.13.13"
 dependencies = [
   "Jinja2>=3.1,<4",
-  "pdfplumber>=0.11.10,<0.12; python_version >= '3.10'",
+  "pdfplumber>=0.11.10,<0.12",
   "pydantic>=2.10,<3",
   "PyYAML>=6,<7",
 ]
@@ -57,14 +57,14 @@ skip_covered = true
 
 [tool.ruff]
 line-length = 100
-target-version = "py39"
+target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
 ignore = ["UP006", "UP007", "UP035", "UP045"]
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.13"
 check_untyped_defs = true
 disallow_untyped_defs = true
 no_implicit_optional = true
