@@ -1,0 +1,18 @@
+{
+  "basic_info": {
+    "name": "最小样例",
+    "school": "示例学院",
+    "major": "软件工程",
+    "degree": "本科",
+    "graduation_year": 2027
+  },
+  "internships": [],
+  "projects": [],
+  "skills": {
+    "programming_languages": [],
+    "monitoring_tools": [],
+    "container_tech": [],
+    "cloud_platforms": [],
+    "cicd_tools": []
+  }
+}

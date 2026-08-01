@@ -1,0 +1,73 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sre-resume-analyzer"
+version = "3.0.0rc1"
+description = "Experimental deterministic SRE resume evidence analyzer"
+readme = "README.md"
+requires-python = "==3.13.13"
+dependencies = [
+  "Jinja2>=3.1,<4",
+  "pdfplumber>=0.11.10,<0.12",
+  "pydantic>=2.10,<3",
+  "PyYAML>=6,<7",
+]
+
+[project.optional-dependencies]
+dev = [
+  "bandit>=1.8,<2",
+  "hypothesis>=6.120,<7",
+  "mypy>=1.13,<2",
+  "pip-audit>=2.9,<3",
+  "pytest>=8,<9",
+  "pytest-cov>=6,<8",
+  "ruff>=0.11,<1",
+  "types-PyYAML>=6,<7",
+]
+
+[project.scripts]
+analyze-resume = "sre_resume_analyzer.cli:analyze_main"
+batch-analyze = "sre_resume_analyzer.cli:batch_main"
+calibrate-scoring = "sre_resume_analyzer.cli:calibrate_main"
+extract-resume-text = "sre_resume_analyzer.cli:extract_main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+sre_resume_analyzer = ["templates/*.md"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-config --strict-markers"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["sre_resume_analyzer"]
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true
+skip_covered = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+ignore = ["UP006", "UP007", "UP035", "UP045"]
+
+[tool.mypy]
+python_version = "3.13"
+check_untyped_defs = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+packages = ["sre_resume_analyzer"]

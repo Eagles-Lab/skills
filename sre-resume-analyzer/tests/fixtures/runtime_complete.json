@@ -1,0 +1,49 @@
+{
+  "resume_id": "candidate_complete",
+  "basic_info": {
+    "name": "测试候选人",
+    "school": "示例大学",
+    "major": "计算机科学",
+    "degree": "硕士",
+    "graduation_year": 2027,
+    "contact": {
+      "email": "candidate@example.invalid",
+      "phone": "000-0000-0000"
+    }
+  },
+  "internships": [
+    {
+      "company": "示例科技",
+      "role": "SRE 实习生",
+      "duration": "2025-06/2025-09",
+      "description": "负责使用Prometheus和Grafana部署监控平台，设计告警规则并参与故障复盘。",
+      "tech_stack": ["Prometheus", "Grafana", "Alertmanager"],
+      "achievements": ["生产环境告警噪音降低30%，MTTR降低20%"]
+    }
+  ],
+  "projects": [
+    {
+      "name": "云原生交付平台",
+      "role": "负责人",
+      "duration": "2025-01/2025-05",
+      "description": "主导基于Kubernetes和Terraform构建自动化交付平台，部署GitHub Actions流水线。",
+      "tech_stack": ["Kubernetes", "Terraform", "GitHub Actions", "Python"],
+      "achievements": ["部署时间降低50%，支持20个服务"]
+    },
+    {
+      "name": "智能故障助手",
+      "role": "开发者",
+      "duration": "2024-09/2024-12",
+      "description": "实现基于LLM和RAG的故障诊断助手并接入AIOps工作流。",
+      "tech_stack": ["LLM", "RAG", "Python", "AIOps"],
+      "achievements": ["同项目诊断时间降低25%"]
+    }
+  ],
+  "skills": {
+    "programming_languages": ["Python", "Go"],
+    "monitoring_tools": ["Prometheus", "Grafana", "Alertmanager"],
+    "container_tech": ["Docker", "Kubernetes", "Helm"],
+    "cloud_platforms": ["AWS"],
+    "cicd_tools": ["GitHub Actions", "Terraform"]
+  }
+}
