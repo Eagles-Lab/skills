@@ -1,0 +1,162 @@
+name: SRE Resume Analyzer v3
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/sre-resume-analyzer.yml"
+      - "README.md"
+      - "CLAUDE.md"
+      - "sre-resume-analyzer/**"
+  push:
+    paths:
+      - ".github/workflows/sre-resume-analyzer.yml"
+      - "README.md"
+      - "CLAUDE.md"
+      - "sre-resume-analyzer/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python-quality:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.11", "3.13"]
+    defaults:
+      run:
+        working-directory: sre-resume-analyzer
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: sre-resume-analyzer/uv.lock
+
+      - name: Install locked package and development tools
+        run: uv sync --frozen --extra dev --python '${{ matrix.python-version }}'
+
+      - name: Check formatting
+        run: uv run ruff format --check .
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Type check
+        run: uv run mypy src
+
+      - name: Test with coverage gate
+        run: >-
+          uv run pytest
+          --cov=sre_resume_analyzer
+          --cov-report=term-missing
+          --cov-report=xml
+          --cov-report=json:coverage.json
+          --cov-fail-under=85
+
+      - name: Enforce critical-module coverage
+        run: uv run python scripts/check_coverage_gates.py coverage.json
+
+      - name: Audit installed dependencies
+        run: |
+          uv export \
+            --quiet \
+            --frozen \
+            --no-dev \
+            --no-emit-project \
+            --format requirements-txt \
+            --output-file runtime-requirements.txt
+          uv run pip-audit \
+            --disable-pip \
+            --no-deps \
+            --requirement runtime-requirements.txt
+
+      - name: Static security scan
+        if: matrix.python-version == '3.11'
+        run: uv run bandit -q -r src -ll
+
+      - name: Build wheel and verify a clean CLI install
+        if: matrix.python-version == '3.11'
+        shell: bash
+        run: |
+          wheel_root="$RUNNER_TEMP/sre-resume-wheel"
+          uv build --wheel --out-dir "$wheel_root/dist"
+          uv venv --python '${{ matrix.python-version }}' "$wheel_root/venv"
+          wheel_path="$(find "$wheel_root/dist" -name '*.whl' -print -quit)"
+          uv pip install --python "$wheel_root/venv/bin/python" "$wheel_path"
+          "$wheel_root/venv/bin/analyze-resume" --help >/dev/null
+          "$wheel_root/venv/bin/extract-resume-text" --help >/dev/null
+          "$wheel_root/venv/bin/batch-analyze" --help >/dev/null
+          "$wheel_root/venv/bin/calibrate-scoring" --help >/dev/null
+          "$wheel_root/venv/bin/analyze-resume" \
+            --extracted tests/fixtures/runtime_complete.json \
+            --output-dir "$wheel_root/output"
+          test "$(find "$wheel_root/output/candidate_complete" -type f | wc -l)" -eq 5
+
+  skill-surface:
+    name: Skill metadata and links
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install validator dependency
+        run: python -m pip install 'PyYAML>=6,<7'
+
+      - name: Check out pinned OpenAI skill validator
+        uses: actions/checkout@v4
+        with:
+          repository: openai/skills
+          ref: 49f948faa9258a0c61caceaf225e179651397431
+          path: .ci/openai-skills
+
+      - name: Validate skill structure
+        run: >-
+          python
+          .ci/openai-skills/skills/.system/skill-creator/scripts/quick_validate.py
+          sre-resume-analyzer
+
+      - name: Validate local Markdown links
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          from urllib.parse import unquote
+
+          roots = [Path("README.md"), Path("CLAUDE.md")]
+          roots.extend(Path("sre-resume-analyzer").glob("*.md"))
+          roots.extend(Path("sre-resume-analyzer/references").glob("*.md"))
+          pattern = re.compile(r"(?<!!)\[[^\]]+\]\(([^)]+)\)")
+          failures = []
+
+          for document in sorted(roots):
+              text = document.read_text(encoding="utf-8")
+              for raw_target in pattern.findall(text):
+                  target = raw_target.strip().strip("<>").split("#", 1)[0]
+                  if not target or target.startswith(("http://", "https://", "mailto:")):
+                      continue
+                  resolved = (document.parent / unquote(target)).resolve()
+                  if not resolved.exists():
+                      failures.append(f"{document}: missing {raw_target}")
+
+          if failures:
+              raise SystemExit("\n".join(failures))
+          print(f"Validated local links in {len(roots)} Markdown files")
+          PY

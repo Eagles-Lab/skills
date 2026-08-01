@@ -1,28 +1,22 @@
 # Skills
 
-Agent Skills - 可复用的专业能力模块
+Reusable agent skills maintained in this repository.
 
-## 可用技能
+## SRE Resume Analyzer
 
-### sre-resume-analyzer
+[`sre-resume-analyzer`](sre-resume-analyzer/README.md) is an **experimental**
+v3.0 skill for evidence-based analysis of SRE, DevOps, platform engineering,
+and operations resumes.
 
-SRE 简历自动化分析工具（v2.3.0）- 基于证据的 "6+1" 评分体系
+The workflow separates untrusted document extraction from deterministic
+analysis:
 
-**核心功能**：
-- 📊 自动评分（6 维度 + AI 加分）
-- 🎯 个性化面试题生成
-- 📄 批量处理支持
-- 🚀 完全自动化脚本
-
-**快速使用**：
-```bash
-# 单个简历
-venv/bin/python3 sre-resume-analyzer/scripts/analyze_resume.py \
-  --extracted resume_extracted.json
-
-# 批量处理
-venv/bin/python3 sre-resume-analyzer/scripts/batch_processor.py \
-  --input-dir ./resumes --parallel 3
+```text
+PDF -> agent extraction -> canonical v3 JSON -> deterministic CLI -> five outputs
 ```
 
-**详细文档**: [sre-resume-analyzer/README.md](sre-resume-analyzer/README.md)
+The current release candidate is `3.0.0-rc.1`. It rejects v2 input and must not
+be used as the sole basis for hiring decisions. Stable release requires private,
+de-identified calibration and real Codex and Claude forward tests.
+
+See the skill README for installation, commands, limits, and privacy guidance.

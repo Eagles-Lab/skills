@@ -1,0 +1,9 @@
+resume_id,reviewer_id,monitoring,alerting,automation,containerization,incident_handling,resume_quality,ai_bonus,overall_grade,notes
+cal-1,sre-a,2,2,2,2,2,2,0,F,deidentified fixture
+cal-1,sre-b,2,2,2,2,2,2,0,F,deidentified fixture
+cal-2,sre-a,4,4,4,4,4,4,0,D,deidentified fixture
+cal-2,sre-b,4,4,4,4,4,4,0,D,deidentified fixture
+cal-3,sre-a,6,6,6,6,6,6,0,C,deidentified fixture
+cal-3,sre-b,6,6,6,6,6,6,0,C,deidentified fixture
+cal-4,sre-a,8,8,8,8,8,8,0.5,A,deidentified fixture
+cal-4,sre-b,8,8,8,8,8,8,0.5,A,deidentified fixture

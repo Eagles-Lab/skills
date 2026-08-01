@@ -1,0 +1,4 @@
+interface:
+  display_name: "SRE Resume Analyzer"
+  short_description: "Experimental evidence-based SRE resume analysis"
+  default_prompt: "Use $sre-resume-analyzer to analyze this SRE resume safely and generate the deterministic five-file output bundle."

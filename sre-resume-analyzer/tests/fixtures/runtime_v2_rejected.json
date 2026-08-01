@@ -1,0 +1,14 @@
+{
+  "resume_id": "legacy",
+  "basic_info": {
+    "name": "Legacy",
+    "education": "Old University Computer Science"
+  },
+  "internships": [
+    {"company": "Old Co", "position": "SRE", "description": "Prometheus"}
+  ],
+  "projects": [
+    {"name": "Old Project", "description": "Kubernetes", "technologies": ["Kubernetes"]}
+  ],
+  "skills": ["Prometheus", "Kubernetes"]
+}

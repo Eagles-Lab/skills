@@ -1,53 +1,47 @@
-# Python
-*.py[cod]
-*$py.class
+# Python bytecode and build output
 __pycache__/
+*.py[cod]
 *.so
 .Python
 build/
-develop-eggs/
 dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
 *.egg-info/
-.installed.cfg
-*.egg
+.eggs/
 
-# Virtual Environment
-venv/
+# Virtual environments and tool caches
 .venv/
+venv/
 env/
 ENV/
+.coverage
+.coverage.*
+coverage.xml
+coverage.json
+htmlcov/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.hypothesis/
 
-# IDE
+# Editors and operating systems
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-
-# OS
 .DS_Store
 Thumbs.db
 
-# Project specific
-# 处理结果目录
+# Resume inputs, raw extraction, generated output, and private calibration
 processing/
-
-# 从 YAML 生成的文档（仅供本地查看）
-references/sre_keywords.md
-config/keywords_core.json
-
-# PDF 提取的临时文件
+outputs/
+raw_extraction.json
+*_raw_extraction.json
 *_extracted.json
+calibration-private/
+sre-resume-analyzer/calibration-private/
+sre-resume-analyzer/private-data/
 
-# 测试数据目录
-sre-resume-analyzer/tests/
-
+# Locally generated keyword artifacts
+sre-resume-analyzer/references/sre_keywords.md
+sre-resume-analyzer/config/keywords_core.json
