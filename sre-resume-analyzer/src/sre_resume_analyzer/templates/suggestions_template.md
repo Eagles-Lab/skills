@@ -1,7 +1,7 @@
-# SRE 简历证据分析与优化建议
+# 校招 SRE 简历证据分析与优化建议
 
 {% if security_warnings %}
-> 安全提示：{{ security_warnings | join('、') }}。可疑原文未进入评分证据或报告上下文。
+> 安全提示：检测到疑似指令性内容；该内容未作为评分证据，也未改变分析流程。
 {% endif %}
 
 ## 基本信息
@@ -13,7 +13,6 @@
 | 专业 | {{ basic_info.major }} |
 | 学历 | {{ basic_info.degree }} |
 | 毕业年份 | {{ basic_info.graduation_year }} |
-| 简历 ID | {{ resume_id }} |
 | 生成时间 | {{ generated_at }} |
 {% if contact %}
 | 邮箱 | {{ contact.email }} |
@@ -22,42 +21,54 @@
 
 ## 综合结果
 
-- 总分：{{ total_score }}/11.5
-- 基础分：{{ base_score }}/10
-- 等级：{{ grade.grade }}（{{ grade.label }}）
-- AI 应用加分：{{ ai_bonus_score }}/1.5
-
-{% if ai_applications %}
-已识别的 AI 实际应用类别：{{ ai_applications | join('、') }}。
-{% else %}
-没有识别到满足证据要求的 AI 实际应用类别。
-{% endif %}
+- 技术证据覆盖总分：{{ total_score }}/10
+- 整体证据覆盖等级：{{ grade.grade }}（{{ grade.label }}）
 
 > {{ status_notice }}
 
-## 六个维度
+## 六个技术维度
 
-| 维度 | 得分 | 权重 | 等级 |
+| 维度 | 证据分 | 权重 | 证据等级 |
 | --- | ---: | ---: | --- |
 {% for dimension in dimensions %}
-| {{ dimension.label }} | {{ dimension.score }}/10 | {{ dimension.weight_percent }}% | {{ dimension.grade }} |
+| {{ dimension.label }} | {{ dimension.score }}/10 | {{ dimension.weight_percent }}% | {{ dimension.evidence_level }} |
 {% endfor %}
 
 {% for dimension in dimensions %}
 ### {{ dimension.label }}（{{ dimension.score }}/10）
 
-评分证据：
+具体证据：
 {% if dimension.evidence %}
 {% for evidence in dimension.evidence %}
 - {{ evidence }}
 {% endfor %}
 {% else %}
-- 暂无满足规则的正向证据。
+- 当前 canonical 事实中未识别到该维度的可计分证据。
 {% endif %}
 
 改进建议：{{ dimension.suggestion }}
 
 {% endfor %}
+## 简历整体质量诊断（不计入技术总分）
+
+诊断分：{{ resume_quality_score }}/10
+
+| 项目 | 得分 | 具体说明 |
+| --- | ---: | --- |
+{% for item in quality_items %}
+| {{ item.label }} | {{ item.score }}/2 | {{ item.finding }} |
+{% endfor %}
+
+## 待补充信息
+
+{% if data_quality_warnings %}
+{% for warning in data_quality_warnings %}
+- `{{ warning.path }}`：{{ warning.message }}
+{% endfor %}
+{% else %}
+- 未发现结构化字段缺失提醒。
+{% endif %}
+
 ## 优势
 
 {% if strengths %}
@@ -65,7 +76,7 @@
 - {{ strength.label }}：{{ strength.summary }}
 {% endfor %}
 {% else %}
-- 暂无得分达到优势阈值的维度。
+- 当前没有达到强证据阈值的技术维度。
 {% endif %}
 
 ## 优先改进项
@@ -75,7 +86,7 @@
 - {{ weakness.label }}：{{ weakness.summary }}
 {% endfor %}
 {% else %}
-- 当前没有低于改进阈值的维度。
+- 当前没有低于改进阈值的技术维度。
 {% endif %}
 
 ## 项目描述优化
@@ -86,4 +97,4 @@
 
 ---
 
-报告版本：{{ analyzer_version }}
+报告版本：{{ analyzer_version }}（experimental）

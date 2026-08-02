@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, Mapping, Optional
@@ -11,14 +12,21 @@ from typing import Any, Callable, Dict, Mapping, Optional
 from pydantic import ValidationError
 
 from .errors import AnalyzerError, InputValidationError, OutputSafetyError
-from .models import SCHEMA_VERSION, Resume
-from .output import derive_resume_id, sha256_file, validate_resume_id, write_output_bundle
+from .models import SCHEMA_VERSION, DataQualityWarning, Resume
+from .output import (
+    derive_output_name,
+    derive_resume_id,
+    sha256_file,
+    validate_resume_id,
+    write_run_output,
+)
 from .rendering import DIMENSION_LABELS, RenderingError, ReportRenderer
 from .scoring import SCORING_CONFIG_VERSION, ScoreCalculator
 from .security import SECURITY_WARNING, contains_instruction_like_content
 from .version import ANALYZER_VERSION, STATUS
 
 Clock = Callable[[], datetime]
+MISSING_DATA_MESSAGE = "未提供或未可靠识别，请后续补充。"
 
 
 def _utc_now() -> datetime:
@@ -49,6 +57,8 @@ def load_resume(path: Path) -> Resume:
         raise InputValidationError(
             f"canonical resume JSON could not be read: {type(exc).__name__}"
         ) from exc
+    if not isinstance(value, Mapping):
+        raise InputValidationError("canonical resume schema v3 root must be an object")
     try:
         return Resume.model_validate(value)
     except ValidationError as exc:
@@ -65,8 +75,30 @@ def _model_mapping(value: Any) -> Dict[str, Any]:
     raise TypeError(f"expected score model or mapping, got {type(value).__name__}")
 
 
+@dataclass(frozen=True)
+class AnalysisArtifacts:
+    resume_id: str
+    output_name: str
+    input_sha256: str
+    extracted: Mapping[str, Any]
+    score: Mapping[str, Any]
+    analysis: Mapping[str, Any]
+    suggestions: str
+    interview_questions: str
+
+    def output_payload(self) -> Dict[str, Any]:
+        return {
+            "output_name": self.output_name,
+            "extracted": self.extracted,
+            "score": self.score,
+            "analysis": self.analysis,
+            "suggestions": self.suggestions,
+            "interview_questions": self.interview_questions,
+        }
+
+
 class ResumeAnalyzer:
-    """Validate, score, render, and atomically persist one resume."""
+    """Validate, score, render, and atomically persist one resume run."""
 
     def __init__(
         self,
@@ -81,47 +113,52 @@ class ResumeAnalyzer:
         self.renderer = renderer or ReportRenderer()
         self.clock = clock
 
-    def inspect_input(self, extracted_path: Path) -> tuple[Resume, str, str]:
-        """Return the validated model, digest, and safe output identifier."""
+    def inspect_input(self, extracted_path: Path) -> tuple[Resume, str, str, str]:
+        """Return the model, digest, internal identifier, and visible output name."""
 
         source = Path(extracted_path)
         resume = load_resume(source)
         input_sha256 = sha256_file(source)
-        if resume.resume_id is not None:
-            resume_id = validate_resume_id(resume.resume_id)
-        else:
-            resume_id = derive_resume_id(resume.basic_info.name, input_sha256)
-        return resume, input_sha256, resume_id
+        resume_id = (
+            validate_resume_id(resume.resume_id)
+            if resume.resume_id is not None
+            else derive_resume_id(resume.basic_info.name, input_sha256)
+        )
+        output_name = derive_output_name(resume.basic_info.name, input_sha256)
+        return resume, input_sha256, resume_id, output_name
 
-    def analyze(
+    def build_artifacts(
         self,
         extracted_path: Path,
         *,
         include_contact: bool = False,
-        overwrite: bool = False,
         seed: Optional[str] = None,
-    ) -> Dict[str, str]:
-        resume, input_sha256, resume_id = self.inspect_input(extracted_path)
+    ) -> AnalysisArtifacts:
+        resume, input_sha256, resume_id, output_name = self.inspect_input(extracted_path)
         generated_at = self.clock().astimezone(UTC).replace(microsecond=0).isoformat()
         generated_at = generated_at.replace("+00:00", "Z")
-        warnings = (
+        data_warnings = collect_data_quality_warnings(resume)
+        security_warnings = (
             [SECURITY_WARNING]
             if contains_instruction_like_content(resume.model_dump(mode="python"))
             else []
         )
 
         try:
-            score_result = self.calculator.calculate(resume)
-            score_data = _model_mapping(score_result)
+            score_data = _model_mapping(self.calculator.calculate(resume))
             score_data.update(
                 {
                     "schema_version": SCHEMA_VERSION,
                     "analyzer_version": ANALYZER_VERSION,
                     "analyzer_status": STATUS,
                     "resume_id": resume_id,
+                    "output_name": output_name,
                     "input_sha256": input_sha256,
                     "generated_at": generated_at,
-                    "warnings": warnings,
+                    "security_warnings": security_warnings,
+                    "data_quality_warnings": [
+                        item.model_dump(mode="json") for item in data_warnings
+                    ],
                     "scoring_config_version": score_data.get(
                         "scoring_config_version", SCORING_CONFIG_VERSION
                     ),
@@ -130,15 +167,18 @@ class ResumeAnalyzer:
             analysis = self._build_analysis(
                 score_data,
                 resume_id,
+                output_name,
                 generated_at,
                 input_sha256,
-                warnings,
+                security_warnings,
+                data_warnings,
             )
             rendered = self.renderer.render(
                 resume,
                 score_data,
                 analysis,
                 resume_id=resume_id,
+                output_name=output_name,
                 generated_at=generated_at,
                 analyzer_version=ANALYZER_VERSION,
                 input_sha256=input_sha256,
@@ -147,15 +187,15 @@ class ResumeAnalyzer:
             )
             extracted = resume.model_dump(mode="json")
             extracted["resume_id"] = resume_id
-            return write_output_bundle(
-                self.output_dir,
-                resume_id,
+            return AnalysisArtifacts(
+                resume_id=resume_id,
+                output_name=output_name,
+                input_sha256=input_sha256,
                 extracted=extracted,
                 score=score_data,
                 analysis=analysis,
                 suggestions=rendered.suggestions,
                 interview_questions=rendered.interview_questions,
-                overwrite=overwrite,
             )
         except (InputValidationError, OutputSafetyError):
             raise
@@ -166,13 +206,35 @@ class ResumeAnalyzer:
         except Exception as exc:
             raise AnalyzerError(f"analysis failed: {type(exc).__name__}") from exc
 
+    def analyze(
+        self,
+        extracted_path: Path,
+        *,
+        include_contact: bool = False,
+        overwrite: bool = False,
+        seed: Optional[str] = None,
+    ) -> Dict[str, str]:
+        artifacts = self.build_artifacts(
+            extracted_path,
+            include_contact=include_contact,
+            seed=seed,
+        )
+        outputs = write_run_output(
+            self.output_dir,
+            [artifacts.output_payload()],
+            overwrite=overwrite,
+        )
+        return outputs[artifacts.output_name]
+
     def _build_analysis(
         self,
         score: Mapping[str, Any],
         resume_id: str,
+        output_name: str,
         generated_at: str,
         input_sha256: str,
-        warnings: list[str],
+        security_warnings: list[str],
+        data_warnings: list[DataQualityWarning],
     ) -> Dict[str, Any]:
         strengths = []
         weaknesses = []
@@ -181,42 +243,83 @@ class ResumeAnalyzer:
             info = dimensions.get(name, {})
             numeric_score = float(info.get("score", 1.0))
             evidence_count = len(info.get("evidence", []))
+            item = {
+                "dimension": name,
+                "label": DIMENSION_LABELS[name],
+                "score": numeric_score,
+                "evidence_count": evidence_count,
+            }
             if numeric_score >= 8.0:
-                strengths.append(
-                    {
-                        "dimension": name,
-                        "label": DIMENSION_LABELS[name],
-                        "score": numeric_score,
-                        "summary": f"有 {evidence_count} 条满足规则的证据。",
-                    }
-                )
-            elif numeric_score < 7.0:
-                weaknesses.append(
-                    {
-                        "dimension": name,
-                        "label": DIMENSION_LABELS[name],
-                        "score": numeric_score,
-                        "summary": "证据覆盖不足，建议补充个人行动、规模和验证结果。",
-                    }
-                )
+                item["summary"] = f"有 {evidence_count} 条规则证据支持较强覆盖。"
+                strengths.append(item)
+            elif numeric_score < 6.0:
+                item["summary"] = "证据覆盖有限，建议补充个人行动、验证过程和同源结果。"
+                weaknesses.append(item)
 
         grade = score.get("grade", {})
+        ai_dimension = dimensions.get("ai_engineering_aiops", {})
         return {
             "schema_version": SCHEMA_VERSION,
             "analyzer_version": ANALYZER_VERSION,
             "analyzer_status": STATUS,
             "resume_id": resume_id,
+            "output_name": output_name,
             "input_sha256": input_sha256,
             "generated_at": generated_at,
-            "warnings": warnings,
+            "security_warnings": security_warnings,
+            "data_quality_warnings": [item.model_dump(mode="json") for item in data_warnings],
             "strengths": strengths,
             "weaknesses": weaknesses,
             "ai_analysis": {
-                "score": score.get("ai_bonus", {}).get("score", 0.0),
-                "applications": score.get("ai_bonus", {}).get("applications", {}),
+                "score": ai_dimension.get("score", 1.0),
+                "evidence": ai_dimension.get("evidence", []),
             },
+            "resume_quality": score.get("resume_quality", {}),
             "overall_assessment": (
                 f"简历证据覆盖等级为 {grade.get('grade', 'F')}。"
                 "该结果仅用于定位简历证据缺口，不能单独用于招聘决策。"
             ),
         }
+
+
+def collect_data_quality_warnings(resume: Resume) -> list[DataQualityWarning]:
+    """Create stable, structured reminders without inventing missing facts."""
+
+    warnings: list[DataQualityWarning] = []
+
+    def missing(code: str, path: str) -> None:
+        warnings.append(DataQualityWarning(code=code, path=path, message=MISSING_DATA_MESSAGE))
+
+    basic = resume.basic_info
+    for field in ("name", "school", "major", "degree", "graduation_year"):
+        if getattr(basic, field) is None:
+            missing(f"missing_basic_info_{field}", f"basic_info.{field}")
+    contact = basic.contact
+    for field in ("phone", "email"):
+        if contact is None or getattr(contact, field) is None:
+            missing(f"missing_contact_{field}", f"basic_info.contact.{field}")
+
+    if not resume.internships:
+        missing("missing_internships", "internships")
+    for index, internship in enumerate(resume.internships):
+        for field in ("company", "role", "duration", "description"):
+            if getattr(internship, field) is None:
+                missing(f"missing_internship_{field}", f"internships.{index}.{field}")
+        for field in ("tech_stack", "achievements"):
+            if not getattr(internship, field):
+                missing(f"missing_internship_{field}", f"internships.{index}.{field}")
+
+    if not resume.projects:
+        missing("missing_projects", "projects")
+    for index, project in enumerate(resume.projects):
+        for field in ("name", "role", "duration", "description"):
+            if getattr(project, field) is None:
+                missing(f"missing_project_{field}", f"projects.{index}.{field}")
+        for field in ("tech_stack", "achievements"):
+            if not getattr(project, field):
+                missing(f"missing_project_{field}", f"projects.{index}.{field}")
+
+    for field, items in resume.skills.model_dump(mode="python").items():
+        if not items:
+            missing(f"missing_skills_{field}", f"skills.{field}")
+    return warnings

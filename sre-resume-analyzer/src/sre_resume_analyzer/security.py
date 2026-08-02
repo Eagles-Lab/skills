@@ -17,8 +17,13 @@ _STRONG_PATTERNS = (
     re.compile(r"\b(?:reveal|print|disclose)\b.{0,32}\b(?:system prompt|system message|secret)\b"),
     re.compile(r"\b(?:change|set|assign)\b.{0,24}\b(?:final\s+)?(?:score|grade)\b.{0,16}\bto\b"),
     re.compile(r"忽略.{0,16}(?:之前|先前|系统).{0,8}(?:指令|提示)"),
+    re.compile(r"忽略.{0,16}(?:前述|上述|现有|原有).{0,8}(?:流程|规则|要求|指令|提示)"),
+    re.compile(r"(?:系统|开发者).{0,6}(?:指令|提示).{0,16}(?:忽略|修改|读取|访问|执行)"),
     re.compile(r"(?:泄露|显示|输出).{0,16}(?:系统提示|系统指令|秘密)"),
     re.compile(r"(?:修改|设置|指定).{0,16}(?:评分|分数|等级)"),
+    re.compile(
+        r"(?:将|把).{0,16}(?:全部|所有)?.{0,8}(?:维度|评分|分数|等级).{0,12}(?:满分|改成|改为|设置)"
+    ),
 )
 _SIGNAL_PATTERNS = (
     re.compile(r"\b(?:run|execute)\b.{0,20}\b(?:shell|command|code|script)\b"),
@@ -29,8 +34,13 @@ _SIGNAL_PATTERNS = (
     re.compile(r"(?:执行|运行).{0,16}(?:命令|代码|脚本)"),
     re.compile(r"(?:打开|访问).{0,16}https?://"),
     re.compile(r"调用.{0,12}工具"),
+    re.compile(r"(?:读取|获取).{0,12}(?:环境变量|密钥|凭据)"),
+    re.compile(r"(?:访问|打开).{0,12}(?:外部链接|外部网址|网络地址)"),
 )
 _CONTROL_CHARACTERS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+_EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+_MOBILE_PHONE = re.compile(r"(?<!\d)(?:\+?86[- ]?)?1[3-9]\d{9}(?!\d)")
+OMITTED_CONTACT_TEXT = "[contact omitted]"
 
 
 def is_instruction_like(text: str) -> bool:
@@ -62,7 +72,18 @@ def sanitize_report_text(value: Any) -> str:
     if is_instruction_like(text):
         return OMITTED_REPORT_TEXT
     cleaned = _CONTROL_CHARACTERS.sub("", text)
+    cleaned = _EMAIL.sub(OMITTED_CONTACT_TEXT, cleaned)
+    cleaned = _MOBILE_PHONE.sub(OMITTED_CONTACT_TEXT, cleaned)
     return html.escape(cleaned, quote=False)
+
+
+def sanitize_included_contact_text(value: Any) -> str:
+    """Safely render contact data only after the caller has explicitly opted in."""
+
+    text = str(value)
+    if is_instruction_like(text):
+        return OMITTED_REPORT_TEXT
+    return html.escape(_CONTROL_CHARACTERS.sub("", text), quote=False)
 
 
 def sanitize_report_list(values: Any) -> list[str]:

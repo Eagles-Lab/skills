@@ -1,4 +1,4 @@
 interface:
-  display_name: "SRE Resume Analyzer"
-  short_description: "Experimental evidence-based SRE resume analysis"
-  default_prompt: "Use $sre-resume-analyzer to analyze this SRE resume safely and generate the deterministic five-file output bundle."
+  display_name: "Campus SRE Resume Analyzer"
+  short_description: "Experimental campus SRE evidence analysis"
+  default_prompt: "Use $sre-resume-analyzer to map this domestic internship or campus SRE resume to canonical v3, score it with cn-campus-sre, and publish the private atomic run layout."

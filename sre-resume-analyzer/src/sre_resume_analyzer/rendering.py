@@ -1,4 +1,4 @@
-"""Deterministic Markdown rendering for analyzer reports."""
+"""Deterministic Markdown rendering for campus SRE reports."""
 # ruff: noqa: RUF001
 
 from __future__ import annotations
@@ -12,70 +12,82 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 from jinja2 import Environment, FileSystemLoader, PackageLoader, StrictUndefined, TemplateError
 
-from .security import sanitize_report_list, sanitize_report_text
+from .security import (
+    sanitize_included_contact_text,
+    sanitize_report_list,
+    sanitize_report_text,
+)
+
+MISSING_DISPLAY = "未提供或未可靠识别，请后续补充。"
 
 DIMENSION_LABELS = {
-    "monitoring": "监控相关经验",
-    "alerting": "告警设计能力",
-    "automation": "自动化能力",
-    "containerization": "容器化/云原生",
-    "incident_handling": "故障处理经验",
-    "resume_quality": "简历整体质量",
+    "systems_network_foundation": "计算机系统与网络基础",
+    "programming_automation": "编程与自动化工程",
+    "troubleshooting": "故障分析与问题解决",
+    "cloud_distributed_infrastructure": "云基础设施与分布式系统",
+    "reliability_engineering": "可靠性工程实践",
+    "ai_engineering_aiops": "AI 辅助工程与 AIOps 实践",
 }
 
 IMPROVEMENT_SUGGESTIONS = {
-    "monitoring": "补充监控指标、SLI/SLO、仪表盘以及生产规模的具体证据。",
-    "alerting": "说明告警分级、降噪、值班响应和 Runbook 的设计与效果。",
-    "automation": "补充脚本、CI/CD 或 IaC 的实现范围以及可量化结果。",
-    "containerization": "说明容器平台的设计、部署、排障和生产运维责任。",
-    "incident_handling": "使用时间线描述故障发现、止损、根因和复盘改进。",
-    "resume_quality": "用行动、范围和结果重写薄弱经历，避免只罗列工具名。",
+    "systems_network_foundation": (
+        "结合课程实验或项目说明 Linux、网络、并发、存储等基础原理如何用于实际判断。"
+    ),
+    "programming_automation": "补充可运行代码、测试、自动化边界、失败处理和验证结果。",
+    "troubleshooting": "按现象、假设、证据、根因、修复与回归验证描述一次排障。",
+    "cloud_distributed_infrastructure": "说明容器、云或分布式组件的设计取舍、部署过程和故障验证。",
+    "reliability_engineering": "补充监控告警、SLI/SLO、容量、容灾或复盘的具体实践与结果。",
+    "ai_engineering_aiops": (
+        "说明 AI 在编码或运维流程中的输入、评测、人工确认、安全边界和降级方案。"
+    ),
 }
 
 QUESTION_BANK = {
-    "monitoring": [
-        "请基于一次实际经历说明你如何选择 SLI，并将它映射到 SLO。",
-        "你如何验证监控指标能够在用户受影响前发现异常？",
-        "请说明一个仪表盘从需求、实现到持续维护的完整过程。",
+    "systems_network_foundation": [
+        "TCP 连接建立后服务仍超时，你会从哪些系统和网络证据开始排查？",
+        "进程、线程与协程有什么差异？请结合一个项目说明你的选择。",
+        "DNS 解析异常可能出现在哪些层次？你会如何逐层验证？",
+        "请解释一次你用操作系统或数据结构知识解决实际问题的经历。",
     ],
-    "alerting": [
-        "请说明你如何设计告警分级、去重和升级策略。",
+    "programming_automation": [
+        "请介绍一个你实现的自动化工具，并说明输入校验、测试和失败恢复。",
+        "如何判断一项重复工作值得自动化？如何验证自动化没有放大风险？",
+        "请说明你最熟悉语言中的并发、错误处理和可测试性设计。",
+        "CI/CD 变更如何做到可审查、可回滚和结果可验证？",
+    ],
+    "troubleshooting": [
+        "请按时间线描述一次排障，区分现象、假设、证据和根因。",
+        "日志、指标和调用链结论冲突时，你如何设计下一步实验？",
+        "如何证明故障已经真正恢复，而不是指标暂时回落？",
+        "面对完全陌生的系统，你会如何建立最小排障路径？",
+    ],
+    "cloud_distributed_infrastructure": [
+        "请描述一次容器或 Kubernetes 工作负载异常的定位过程。",
+        "分布式系统中超时、重试和幂等应如何共同设计？",
+        "如何为服务设置资源请求、限制和扩缩容策略并验证？",
+        "请说明一个云基础设施设计中的取舍及失败场景。",
+    ],
+    "reliability_engineering": [
+        "如何从用户体验定义 SLI，并把它映射到 SLO 和告警？",
         "遇到告警风暴时，你会如何止损并验证降噪效果？",
-        "一个可执行的 Runbook 应包含哪些信息？请结合实际案例回答。",
+        "一次故障复盘如何形成可追踪、可验证的改进项？",
+        "请设计一次容量或容灾演练，并说明成功判据。",
     ],
-    "automation": [
-        "请介绍一个你亲自实现的自动化流程，以及失败回滚机制。",
-        "你如何测试 IaC 或 CI/CD 变更，避免把错误带入生产？",
-        "请说明一个自动化项目的投入、覆盖范围和量化收益。",
-    ],
-    "containerization": [
-        "请描述一次 Kubernetes 工作负载异常的定位过程。",
-        "如何为容器化服务设计资源请求、限制和扩缩容策略？",
-        "请说明一次云原生平台设计中的取舍以及验证方式。",
-    ],
-    "incident_handling": [
-        "请按时间线描述一次故障处理，并区分现象、根因和修复。",
-        "如何判断故障已经真正恢复，而不是指标暂时回落？",
-        "复盘中的改进项如何跟踪到完成并验证有效性？",
-    ],
-    "resume_quality": [
-        "请选择一段经历，用 STAR 方法补充你的个人行动和结果。",
-        "简历中的量化结果如何采集，怎样证明它可归因于你的工作？",
-        "请区分你了解、参与和主导的技术，并分别给出证据。",
+    "ai_engineering_aiops": [
+        "你如何验证 AI 生成的代码、测试或排障建议，而不是直接信任结果？",
+        "请设计一个告警摘要或自动诊断流程，说明评测集和人工确认点。",
+        "RAG 或 Agent 接入运维数据时，权限、脱敏和提示注入如何处理？",
+        "AI 服务不可用或输出低置信度时，系统如何降级或回滚？",
     ],
 }
 
 GENERAL_QUESTIONS = [
-    "请介绍一个你最有把握的 SRE 项目，明确你的个人职责和交付结果。",
+    "请介绍一个你最有把握的项目，明确个人职责、关键决策和验证结果。",
     "当信息不完整时，你如何组织一次线上问题调查？",
     "请举例说明你如何在交付速度与系统可靠性之间做取舍。",
-    "你如何验证一个可靠性改进在长期运行中仍然有效？",
     "最近一次技术判断失误是什么？你如何发现并纠正它？",
-    "请说明你如何与开发团队共同定义并落实可靠性目标。",
-    "如何判断一项重复工作值得自动化？",
-    "如果入职后只能先改善一个可靠性问题，你会如何选择？",
-    "请描述你如何把一次故障经验沉淀为团队能力。",
-    "面对未知系统，你会如何建立可观测性和排障基线？",
+    "课程项目与真实环境有哪些差异？你会如何补齐验证？",
+    "请区分你了解、实际使用和独立负责的技术，并分别给出证据。",
 ]
 
 
@@ -85,43 +97,47 @@ class RenderingError(RuntimeError):
 
 @dataclass(frozen=True)
 class RenderedReports:
-    """The two Markdown artifacts produced for one analysis."""
-
     suggestions: str
     interview_questions: str
 
 
 def _to_mapping(value: Any) -> Dict[str, Any]:
     if hasattr(value, "model_dump"):
-        dumped = value.model_dump(mode="json")
-        return dict(dumped)
+        return dict(value.model_dump(mode="json"))
     if isinstance(value, Mapping):
         return dict(value)
     raise TypeError(f"expected a model or mapping, got {type(value).__name__}")
 
 
-def _grade_for_dimension(score: float) -> str:
-    if score >= 9:
-        return "A"
-    if score >= 7:
-        return "B"
-    if score >= 5:
-        return "C"
-    if score >= 3:
-        return "D"
-    return "F"
+def _display(value: Any) -> str:
+    return sanitize_report_text(value) if value not in (None, "") else MISSING_DISPLAY
 
 
 def _evidence_text(item: Mapping[str, Any]) -> str:
-    for key in ("text", "context", "description", "keyword"):
-        value = item.get(key)
-        if value:
-            return sanitize_report_text(value)
-    return "已识别到结构化证据"
+    for key in ("context", "description", "keyword"):
+        if item.get(key):
+            return sanitize_report_text(item[key])
+    return "已识别到结构化证据。"
+
+
+def _evidence_level(score: float) -> str:
+    if score >= 10:
+        return "多来源强证据"
+    if score >= 9:
+        return "真实环境或同源结果"
+    if score >= 8:
+        return "完整项目与验证"
+    if score >= 6:
+        return "可运行实现"
+    if score >= 4:
+        return "实际使用"
+    if score >= 2:
+        return "课程、技能或工具提及"
+    return "未识别到相关证据"
 
 
 class ReportRenderer:
-    """Render report templates with strict, deterministic inputs."""
+    """Render strict, deterministic Markdown view models."""
 
     def __init__(self, template_dir: Optional[Path] = None) -> None:
         loader = (
@@ -129,7 +145,6 @@ class ReportRenderer:
             if template_dir is None
             else FileSystemLoader(str(Path(template_dir)))
         )
-        # The templates render Markdown files only; HTML autoescape would corrupt evidence text.
         self.environment = Environment(  # nosec B701
             loader=loader,
             undefined=StrictUndefined,
@@ -146,39 +161,38 @@ class ReportRenderer:
         analysis: Mapping[str, Any],
         *,
         resume_id: str,
+        output_name: str,
         generated_at: str,
         analyzer_version: str,
         input_sha256: str,
         seed: Optional[str] = None,
         include_contact: bool = False,
     ) -> RenderedReports:
+        del resume_id, output_name
         resume_data = _to_mapping(resume)
         score_data = _to_mapping(score)
         context = self._suggestions_context(
             resume_data,
             score_data,
             analysis,
-            resume_id=resume_id,
             generated_at=generated_at,
             analyzer_version=analyzer_version,
             include_contact=include_contact,
         )
-        questions = self._build_questions(
-            resume_data,
-            score_data,
-            seed=seed if seed is not None else input_sha256,
-        )
         question_context = {
             "basic_info": self._safe_basic_info(resume_data["basic_info"]),
-            "resume_id": resume_id,
             "generated_at": generated_at,
             "analyzer_version": analyzer_version,
             "contact": self._safe_contact(resume_data["basic_info"].get("contact"))
             if include_contact
             else None,
-            "questions": questions,
+            "questions": self._build_questions(
+                resume_data,
+                score_data,
+                seed=seed if seed is not None else input_sha256,
+            ),
             "focus_areas": self._focus_areas(score_data),
-            "security_warnings": list(analysis.get("warnings", [])),
+            "security_warnings": list(analysis.get("security_warnings", [])),
         }
         try:
             suggestions = self.environment.get_template("suggestions_template.md").render(**context)
@@ -195,71 +209,81 @@ class ReportRenderer:
         score: Mapping[str, Any],
         analysis: Mapping[str, Any],
         *,
-        resume_id: str,
         generated_at: str,
         analyzer_version: str,
         include_contact: bool,
     ) -> Dict[str, Any]:
-        dimensions = []
         raw_dimensions = score.get("dimension_scores", {})
+        dimensions = []
         for name in DIMENSION_LABELS:
             info = dict(raw_dimensions.get(name, {}))
             numeric_score = float(info.get("score", 1.0))
-            evidence = [
-                _evidence_text(item)
-                for item in info.get("evidence", [])
-                if isinstance(item, Mapping)
-            ]
             dimensions.append(
                 {
-                    "name": name,
                     "label": DIMENSION_LABELS[name],
                     "score": numeric_score,
                     "weight_percent": round(float(info.get("weight", 0)) * 100),
-                    "grade": _grade_for_dimension(numeric_score),
-                    "evidence": evidence,
+                    "evidence_level": _evidence_level(numeric_score),
+                    "evidence": [
+                        _evidence_text(item)
+                        for item in info.get("evidence", [])
+                        if isinstance(item, Mapping)
+                    ],
                     "suggestion": IMPROVEMENT_SUGGESTIONS[name],
                 }
             )
-
-        ai_bonus = dict(score.get("ai_bonus", {}))
-        applications = ai_bonus.get("applications", {})
-        if isinstance(applications, Mapping):
-            application_names = sorted(str(key) for key in applications)
-        elif isinstance(applications, Sequence) and not isinstance(applications, str):
-            application_names = sorted(str(item) for item in applications)
-        else:
-            application_names = []
-
+        quality = dict(score.get("resume_quality", {}))
+        breakdown = quality.get("breakdown", {})
+        findings = quality.get("findings", {})
+        quality_items = [
+            {
+                "label": label,
+                "score": float(breakdown.get(key, 0.0)),
+                "finding": sanitize_report_text(findings.get(key, MISSING_DISPLAY)),
+            }
+            for key, label in (
+                ("completeness", "信息完整性"),
+                ("action_result", "STAR/行动描述"),
+                ("quantified_results", "量化结果质量"),
+                ("clarity", "表达清晰度"),
+                ("timeline_technical_consistency", "时间线与技术表述一致性"),
+            )
+        ]
         return {
             "basic_info": self._safe_basic_info(resume["basic_info"]),
-            "resume_id": resume_id,
             "generated_at": generated_at,
             "analyzer_version": analyzer_version,
             "contact": self._safe_contact(resume["basic_info"].get("contact"))
             if include_contact
             else None,
             "total_score": score.get("total_score", 1.0),
-            "base_score": score.get("base_score", 1.0),
             "grade": score.get("grade", {}),
-            "ai_bonus_score": ai_bonus.get("score", 0.0),
-            "ai_applications": application_names,
             "dimensions": dimensions,
+            "resume_quality_score": quality.get("score", 1.0),
+            "quality_items": quality_items,
             "strengths": self._safe_analysis_items(analysis.get("strengths", [])),
             "weaknesses": self._safe_analysis_items(analysis.get("weaknesses", [])),
             "project_suggestions": self._project_suggestions(resume),
-            "status_notice": "本报告衡量简历中的证据覆盖度，不能单独用于招聘决策。",
-            "security_warnings": list(analysis.get("warnings", [])),
+            "data_quality_warnings": [
+                {
+                    "path": sanitize_report_text(item.get("path", "")),
+                    "message": sanitize_report_text(item.get("message", MISSING_DISPLAY)),
+                }
+                for item in analysis.get("data_quality_warnings", [])
+                if isinstance(item, Mapping)
+            ],
+            "status_notice": "本报告衡量国内实习/校招 SRE 简历的证据覆盖度，不能单独用于招聘决策。",
+            "security_warnings": list(analysis.get("security_warnings", [])),
         }
 
     @staticmethod
     def _safe_basic_info(value: Mapping[str, Any]) -> Dict[str, Any]:
         return {
-            "name": sanitize_report_text(value.get("name", "")),
-            "school": sanitize_report_text(value.get("school", "")),
-            "major": sanitize_report_text(value.get("major", "")),
-            "degree": sanitize_report_text(value.get("degree", "")),
-            "graduation_year": value.get("graduation_year", ""),
+            "name": _display(value.get("name")),
+            "school": _display(value.get("school")),
+            "major": _display(value.get("major")),
+            "degree": _display(value.get("degree")),
+            "graduation_year": value.get("graduation_year") or MISSING_DISPLAY,
         }
 
     @staticmethod
@@ -267,8 +291,12 @@ class ReportRenderer:
         if not isinstance(value, Mapping):
             return None
         return {
-            "email": sanitize_report_text(value.get("email", "")),
-            "phone": sanitize_report_text(value.get("phone", "")),
+            "email": sanitize_included_contact_text(value.get("email"))
+            if value.get("email")
+            else MISSING_DISPLAY,
+            "phone": sanitize_included_contact_text(value.get("phone"))
+            if value.get("phone")
+            else MISSING_DISPLAY,
         }
 
     @staticmethod
@@ -287,12 +315,11 @@ class ReportRenderer:
     def _project_suggestions(self, resume: Mapping[str, Any]) -> List[str]:
         projects = list(resume.get("projects", []))
         if not projects:
-            return ["补充至少一个能够说明个人职责、实施过程和结果的 SRE 项目。"]
+            return ["补充至少一个能够说明个人职责、实施过程和验证结果的项目。"]
         suggestions = []
         for project in projects:
-            name = sanitize_report_text(project.get("name", "未命名项目"))
-            achievements = project.get("achievements", [])
-            if not achievements:
+            name = _display(project.get("name"))
+            if not project.get("achievements"):
                 suggestions.append(f"{name}：补充可验证的结果或运行指标。")
             if not project.get("role"):
                 suggestions.append(f"{name}：明确个人角色和责任边界。")
@@ -316,48 +343,34 @@ class ReportRenderer:
         canonical_seed = hashlib.sha256(str(seed).encode("utf-8")).digest()
         rng = random.Random(int.from_bytes(canonical_seed[:8], "big"))
         candidates: List[Dict[str, Any]] = []
-
         for internship in resume.get("internships", []):
-            company = sanitize_report_text(internship.get("company", "该公司"))
-            role = sanitize_report_text(internship.get("role", "该岗位"))
-            candidates.extend(
-                [
-                    {
-                        "category": "实习经历",
-                        "question": f"请说明你在{company}担任{role}期间承担的具体责任。",
-                        "context": sanitize_report_text(internship.get("description", "")),
-                        "expected_keywords": sanitize_report_list(internship.get("tech_stack", [])),
-                    },
-                    {
-                        "category": "实习经历",
-                        "question": f"请描述你在{company}遇到的一次可靠性问题及验证结果。",
-                        "context": sanitize_report_text(internship.get("description", "")),
-                        "expected_keywords": sanitize_report_list(
-                            internship.get("achievements", [])
-                        ),
-                    },
-                ]
+            company = _display(internship.get("company"))
+            candidates.append(
+                {
+                    "category": "实习经历",
+                    "question": f"请说明你在{company}承担的具体责任、排障过程和验证结果。",
+                    "context": _display(internship.get("description")),
+                    "expected_keywords": sanitize_report_list(internship.get("tech_stack", [])),
+                }
             )
-
         for project in resume.get("projects", []):
-            name = sanitize_report_text(project.get("name", "该项目"))
+            name = _display(project.get("name"))
             candidates.extend(
                 [
                     {
                         "category": "项目经历",
                         "question": f"请说明{name}中你的角色、关键决策和责任边界。",
-                        "context": sanitize_report_text(project.get("description", "")),
+                        "context": _display(project.get("description")),
                         "expected_keywords": sanitize_report_list(project.get("tech_stack", [])),
                     },
                     {
                         "category": "项目经历",
                         "question": f"如果重新实现{name}，你会改变什么？如何验证改进有效？",
-                        "context": sanitize_report_text(project.get("description", "")),
+                        "context": _display(project.get("description")),
                         "expected_keywords": sanitize_report_list(project.get("achievements", [])),
                     },
                 ]
             )
-
         dimensions = score.get("dimension_scores", {})
         ordered_dimensions = sorted(
             DIMENSION_LABELS,
@@ -366,55 +379,42 @@ class ReportRenderer:
         for dimension in ordered_dimensions:
             bank = list(QUESTION_BANK[dimension])
             rng.shuffle(bank)
-            dimension_score = dimensions.get(dimension, {}).get("score", 1.0)
+            dimension_score = float(dimensions.get(dimension, {}).get("score", 1.0))
             candidates.extend(
                 {
                     "category": DIMENSION_LABELS[dimension],
                     "question": question,
-                    "context": f"该维度简历证据得分：{dimension_score}/10",
+                    "context": f"该维度证据等级：{_evidence_level(dimension_score)}",
                     "expected_keywords": [],
                 }
                 for question in bank
             )
-
         general = list(GENERAL_QUESTIONS)
         rng.shuffle(general)
         candidates.extend(
-            {
-                "category": "综合能力",
-                "question": question,
-                "context": "",
-                "expected_keywords": [],
-            }
+            {"category": "综合能力", "question": question, "context": "", "expected_keywords": []}
             for question in general
         )
-
         rng.shuffle(candidates)
         selected: List[Dict[str, Any]] = []
         seen = set()
         for candidate in candidates:
-            question = candidate["question"]
-            if question in seen:
+            if candidate["question"] in seen:
                 continue
-            seen.add(question)
-            candidate = dict(candidate)
-            candidate["id"] = len(selected) + 1
-            candidate["difficulty"] = "中等"
-            candidate["answer_guidance"] = "说明情境、个人行动、验证方式和可归因结果。"
-            selected.append(candidate)
+            seen.add(candidate["question"])
+            item = dict(candidate)
+            item["id"] = len(selected) + 1
+            item["difficulty"] = "校招"
+            item["answer_guidance"] = "说明情境、个人行动、验证方式和可归因结果；不了解时明确边界。"
+            selected.append(item)
             if len(selected) == 10:
                 break
         return selected
 
 
 def stable_render_fingerprint(reports: RenderedReports) -> str:
-    """Return a stable digest useful for regression tests and audit logs."""
-
     payload = json.dumps(
-        {
-            "suggestions": reports.suggestions,
-            "interview_questions": reports.interview_questions,
-        },
+        {"suggestions": reports.suggestions, "interview_questions": reports.interview_questions},
         ensure_ascii=False,
         sort_keys=True,
     )

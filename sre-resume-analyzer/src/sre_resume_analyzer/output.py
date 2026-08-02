@@ -1,4 +1,4 @@
-"""Safe, transactional output bundle handling."""
+"""Safe, transactional output handling for complete analyzer runs."""
 
 from __future__ import annotations
 
@@ -12,18 +12,27 @@ import unicodedata
 import uuid
 from contextlib import suppress
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional
+from typing import Any, Dict, Iterable, Mapping, Optional
 
 from .errors import OutputConflictError, OutputSafetyError
 
 SAFE_RESUME_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
-OUTPUT_FILENAMES = (
+ANALYSIS_FILENAMES = (
     "extracted.json",
     "score.json",
     "analysis.json",
     "suggestions.md",
-    "interview_questions.md",
 )
+_WINDOWS_RESERVED = {
+    "con",
+    "prn",
+    "aux",
+    "nul",
+    *(f"com{index}" for index in range(1, 10)),
+    *(f"lpt{index}" for index in range(1, 10)),
+}
+_UNSAFE_NAME_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f\x7f]')
+_SEPARATORS = re.compile(r"[\s._-]+")
 
 
 def sha256_file(path: Path) -> str:
@@ -37,8 +46,6 @@ def sha256_file(path: Path) -> str:
 
 
 def validate_resume_id(resume_id: str) -> str:
-    """Validate an externally supplied output identifier."""
-
     if not isinstance(resume_id, str) or not SAFE_RESUME_ID.fullmatch(resume_id):
         raise OutputSafetyError(
             "resume_id must match [A-Za-z0-9_-]{1,64}; paths and control characters are forbidden"
@@ -46,35 +53,46 @@ def validate_resume_id(resume_id: str) -> str:
     return resume_id
 
 
-def derive_resume_id(name: str, input_sha256: str) -> str:
-    """Generate a stable safe identifier from a display name and input digest."""
-
-    normalized = unicodedata.normalize("NFKD", name or "resume")
-    ascii_name = normalized.encode("ascii", "ignore").decode("ascii").lower()
-    slug = re.sub(r"[^a-z0-9]+", "-", ascii_name).strip("-") or "resume"
+def _digest_prefix(input_sha256: str) -> str:
     digest = re.sub(r"[^a-fA-F0-9]", "", input_sha256)[:8].lower()
-    if len(digest) != 8:
-        digest = hashlib.sha256(input_sha256.encode("utf-8")).hexdigest()[:8]
-    return validate_resume_id(f"{slug[:55]}-{digest}")
+    return digest if len(digest) == 8 else hashlib.sha256(input_sha256.encode()).hexdigest()[:8]
 
 
-def resolve_bundle_path(output_root: Path, resume_id: str) -> Path:
-    """Resolve a candidate bundle and prove it remains below the output root."""
+def derive_resume_id(name: Optional[str], input_sha256: str) -> str:
+    """Generate an internal stable identifier; it is never a visible path."""
 
-    validated = validate_resume_id(resume_id)
-    root = Path(output_root).expanduser()
-    if root.exists() and (root.is_symlink() or not root.is_dir()):
-        raise OutputSafetyError("output root must be a real directory, not a symlink or file")
-    root.mkdir(parents=True, exist_ok=True)
-    resolved_root = root.resolve(strict=True)
-    target = resolved_root / validated
-    try:
-        target.relative_to(resolved_root)
-    except ValueError as exc:  # defensive even though the identifier is strict
-        raise OutputSafetyError("resolved output path escapes the output root") from exc
-    if target.is_symlink():
-        raise OutputSafetyError("refusing to write through an output symlink")
-    return target
+    del name
+    return validate_resume_id(f"resume-{_digest_prefix(input_sha256)}")
+
+
+def sanitize_display_name(name: Optional[str]) -> str:
+    """Produce one Unicode-preserving cross-platform path component."""
+
+    value = unicodedata.normalize("NFKC", name or "")
+    value = "".join(char for char in value if unicodedata.category(char) != "Cf")
+    value = _UNSAFE_NAME_CHARS.sub("-", value)
+    value = _SEPARATORS.sub("-", value).strip(" .-")
+    value = value.replace("..", "-")[:40].strip(" .-")
+    if not value or value.casefold() in _WINDOWS_RESERVED:
+        return "未知姓名"
+    return value
+
+
+def derive_output_name(name: Optional[str], input_sha256: str) -> str:
+    return f"{sanitize_display_name(name)}-{_digest_prefix(input_sha256)}"
+
+
+def validate_output_name(output_name: str) -> str:
+    if (
+        not isinstance(output_name, str)
+        or not output_name
+        or Path(output_name).name != output_name
+        or output_name in {".", ".."}
+        or _UNSAFE_NAME_CHARS.search(output_name)
+        or output_name.casefold() in _WINDOWS_RESERVED
+    ):
+        raise OutputSafetyError("unsafe candidate output name")
+    return output_name
 
 
 def _stable_json(value: Any) -> str:
@@ -95,132 +113,79 @@ def _write_private(path: Path, content: str) -> None:
         raise
 
 
-def _bundle_payloads(
-    *,
-    extracted: Mapping[str, Any],
-    score: Mapping[str, Any],
-    analysis: Mapping[str, Any],
-    suggestions: str,
-    interview_questions: str,
-) -> Dict[str, str]:
-    payloads = {
-        "extracted.json": _stable_json(extracted),
-        "score.json": _stable_json(score),
-        "analysis.json": _stable_json(analysis),
-        "suggestions.md": suggestions.rstrip() + "\n",
-        "interview_questions.md": interview_questions.rstrip() + "\n",
-    }
-    if tuple(payloads) != OUTPUT_FILENAMES:
-        raise OutputSafetyError("output bundle contract must contain exactly five artifacts")
-    return payloads
-
-
-def write_output_bundle(
-    output_root: Path,
-    resume_id: str,
-    *,
-    extracted: Mapping[str, Any],
-    score: Mapping[str, Any],
-    analysis: Mapping[str, Any],
-    suggestions: str,
-    interview_questions: str,
-    overwrite: bool = False,
-) -> Dict[str, str]:
-    """Write all five artifacts and reveal them only after every write succeeds."""
-
-    final_dir = resolve_bundle_path(output_root, resume_id)
-    root = final_dir.parent
-    if final_dir.exists() and not overwrite:
-        raise OutputConflictError(f"output bundle already exists: {final_dir}")
-    if final_dir.exists() and not final_dir.is_dir():
-        raise OutputSafetyError(f"output target is not a directory: {final_dir}")
-
-    payloads = _bundle_payloads(
-        extracted=extracted,
-        score=score,
-        analysis=analysis,
-        suggestions=suggestions,
-        interview_questions=interview_questions,
-    )
-    temporary = Path(tempfile.mkdtemp(prefix=f".tmp-{resume_id}-", dir=str(root)))
-    os.chmod(temporary, 0o700)
-    backup: Optional[Path] = None
-    committed = False
-    try:
-        for filename in OUTPUT_FILENAMES:
-            _write_private(temporary / filename, payloads[filename])
-
-        if final_dir.exists():
-            if final_dir.is_symlink():
-                raise OutputSafetyError("refusing to overwrite an output symlink")
-            backup = root / f".backup-{resume_id}-{uuid.uuid4().hex}"
-            os.replace(final_dir, backup)
-        try:
-            os.replace(temporary, final_dir)
-            committed = True
-        except Exception:
-            if backup is not None and backup.exists() and not final_dir.exists():
-                os.replace(backup, final_dir)
-                backup = None
-            raise
-        if backup is not None:
-            shutil.rmtree(backup, ignore_errors=True)
-            backup = None
-    except OutputSafetyError:
-        raise
-    except OSError as exc:
-        raise OutputSafetyError(f"failed to commit output bundle: {exc}") from exc
-    finally:
-        if not committed and temporary.exists():
-            shutil.rmtree(temporary, ignore_errors=True)
-        if backup is not None and backup.exists() and not final_dir.exists():
-            os.replace(backup, final_dir)
-
-    return {
-        filename.removesuffix(Path(filename).suffix): str(final_dir / filename)
-        for filename in OUTPUT_FILENAMES
-    }
-
-
-def write_private_directory_bundle(
-    directory: Path,
-    payloads: Mapping[str, str],
-    *,
-    overwrite: bool,
-) -> Dict[str, Path]:
-    """Commit a set of private files by atomically replacing their directory."""
-
-    destination = Path(directory).expanduser()
+def _validate_run_target(output_root: Path, overwrite: bool) -> tuple[Path, Path]:
+    destination = Path(output_root).expanduser()
     if not destination.name or destination.name in {".", ".."}:
-        raise OutputSafetyError("bundle output must name a dedicated directory")
+        raise OutputSafetyError("output must name a dedicated run directory")
     parent = destination.parent
     if parent.exists() and (parent.is_symlink() or not parent.is_dir()):
-        raise OutputSafetyError("bundle output parent must be a real directory")
+        raise OutputSafetyError("output parent must be a real directory")
     parent.mkdir(parents=True, exist_ok=True)
     resolved_parent = parent.resolve(strict=True)
     destination = resolved_parent / destination.name
     if destination.is_symlink():
-        raise OutputSafetyError("refusing to replace a bundle output symlink")
+        raise OutputSafetyError("refusing to replace an output symlink")
     if destination.exists() and not overwrite:
-        raise OutputConflictError(f"output bundle already exists: {destination}")
+        raise OutputConflictError(f"output run already exists: {destination}")
     if destination.exists() and not destination.is_dir():
-        raise OutputSafetyError(f"output bundle target is not a directory: {destination}")
-    if not payloads:
-        raise OutputSafetyError("output bundle must contain at least one file")
-    for filename in payloads:
-        if Path(filename).name != filename or filename in {".", ".."}:
-            raise OutputSafetyError(f"unsafe output bundle filename: {filename}")
+        raise OutputSafetyError("output run target is not a directory")
+    return destination, resolved_parent
 
-    temporary = Path(tempfile.mkdtemp(prefix=f".tmp-{destination.name}-", dir=resolved_parent))
+
+def write_run_output(
+    output_root: Path,
+    candidates: Iterable[Mapping[str, Any]],
+    *,
+    batch_summary: Optional[Mapping[str, Any]] = None,
+    overwrite: bool = False,
+) -> Dict[str, Dict[str, str]]:
+    """Build and atomically publish one complete single or batch run."""
+
+    destination, parent = _validate_run_target(output_root, overwrite)
+    prepared = sorted(candidates, key=lambda item: str(item["output_name"]))
+    names = [validate_output_name(str(item["output_name"])) for item in prepared]
+    if len(names) != len(set(names)):
+        raise OutputSafetyError("duplicate candidate output names")
+
+    temporary = Path(tempfile.mkdtemp(prefix=f".tmp-{destination.name}-", dir=str(parent)))
     os.chmod(temporary, 0o700)
     backup: Optional[Path] = None
     committed = False
+    output_paths: Dict[str, Dict[str, str]] = {}
     try:
-        for filename, content in payloads.items():
-            _write_private(temporary / filename, content.rstrip() + "\n")
+        analyses = temporary / "resume_analysis"
+        interviews = temporary / "interview_questions"
+        analyses.mkdir(mode=0o700)
+        interviews.mkdir(mode=0o700)
+        for item, output_name in zip(prepared, names, strict=True):
+            candidate_dir = analyses / output_name
+            candidate_dir.mkdir(mode=0o700)
+            payloads = {
+                "extracted.json": _stable_json(item["extracted"]),
+                "score.json": _stable_json(item["score"]),
+                "analysis.json": _stable_json(item["analysis"]),
+                "suggestions.md": str(item["suggestions"]).rstrip() + "\n",
+            }
+            for filename in ANALYSIS_FILENAMES:
+                _write_private(candidate_dir / filename, payloads[filename])
+            interview_name = f"{output_name}.md"
+            _write_private(
+                interviews / interview_name,
+                str(item["interview_questions"]).rstrip() + "\n",
+            )
+            final_candidate = destination / "resume_analysis" / output_name
+            output_paths[output_name] = {
+                "extracted": str(final_candidate / "extracted.json"),
+                "score": str(final_candidate / "score.json"),
+                "analysis": str(final_candidate / "analysis.json"),
+                "suggestions": str(final_candidate / "suggestions.md"),
+                "interview_questions": str(destination / "interview_questions" / interview_name),
+            }
+        if batch_summary is not None:
+            _write_private(temporary / "batch_summary.json", _stable_json(batch_summary))
 
         if destination.exists():
-            backup = resolved_parent / f".backup-{destination.name}-{uuid.uuid4().hex}"
+            backup = parent / f".backup-{destination.name}-{uuid.uuid4().hex}"
             os.replace(destination, backup)
         try:
             os.replace(temporary, destination)
@@ -233,53 +198,69 @@ def write_private_directory_bundle(
         if backup is not None:
             shutil.rmtree(backup, ignore_errors=True)
             backup = None
-    except OutputSafetyError:
+    except (OutputSafetyError, OutputConflictError):
         raise
     except OSError as exc:
-        raise OutputSafetyError(f"failed to commit output bundle: {exc}") from exc
+        raise OutputSafetyError(f"failed to commit output run: {type(exc).__name__}") from exc
     finally:
         if not committed and temporary.exists():
             shutil.rmtree(temporary, ignore_errors=True)
         if backup is not None and backup.exists() and not destination.exists():
             os.replace(backup, destination)
+    return output_paths
 
+
+def write_private_directory_bundle(
+    directory: Path,
+    payloads: Mapping[str, str],
+    *,
+    overwrite: bool,
+) -> Dict[str, Path]:
+    """Commit a set of private files by atomically replacing their directory."""
+
+    destination, parent = _validate_run_target(directory, overwrite)
+    if not payloads:
+        raise OutputSafetyError("output bundle must contain at least one file")
+    for filename in payloads:
+        if Path(filename).name != filename or filename in {".", ".."}:
+            raise OutputSafetyError(f"unsafe output bundle filename: {filename}")
+    temporary = Path(tempfile.mkdtemp(prefix=f".tmp-{destination.name}-", dir=str(parent)))
+    os.chmod(temporary, 0o700)
+    backup: Optional[Path] = None
+    committed = False
+    try:
+        for filename, content in payloads.items():
+            _write_private(temporary / filename, content.rstrip() + "\n")
+        if destination.exists():
+            backup = parent / f".backup-{destination.name}-{uuid.uuid4().hex}"
+            os.replace(destination, backup)
+        try:
+            os.replace(temporary, destination)
+            committed = True
+        except Exception:
+            if backup is not None and backup.exists() and not destination.exists():
+                os.replace(backup, destination)
+                backup = None
+            raise
+        if backup is not None:
+            shutil.rmtree(backup, ignore_errors=True)
+            backup = None
+    except OSError as exc:
+        raise OutputSafetyError(f"failed to commit output bundle: {type(exc).__name__}") from exc
+    finally:
+        if not committed and temporary.exists():
+            shutil.rmtree(temporary, ignore_errors=True)
+        if backup is not None and backup.exists() and not destination.exists():
+            os.replace(backup, destination)
     return {filename: destination / filename for filename in payloads}
 
 
 def write_json_atomically(path: Path, value: Mapping[str, Any], *, overwrite: bool) -> Path:
-    """Atomically write a private standalone JSON artifact such as a batch summary."""
-
     destination = Path(path)
-    parent = destination.parent
-    if parent.exists() and (parent.is_symlink() or not parent.is_dir()):
-        raise OutputSafetyError("JSON output parent must be a real directory")
-    parent.mkdir(parents=True, exist_ok=True)
-    destination = parent.resolve(strict=True) / destination.name
-    if destination.is_symlink():
-        raise OutputSafetyError("refusing to replace a JSON output symlink")
-    if destination.exists() and not overwrite:
-        raise OutputConflictError(f"output already exists: {destination}")
-
-    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{destination.name}.", dir=str(parent))
-    temporary = Path(temporary_name)
-    try:
-        os.fchmod(descriptor, 0o600)
-        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
-            handle.write(_stable_json(value))
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary, destination)
-    except OSError as exc:
-        raise OutputSafetyError(f"failed to write JSON output: {exc}") from exc
-    finally:
-        if temporary.exists():
-            temporary.unlink()
-    return destination
+    return write_text_atomically(destination, _stable_json(value), overwrite=overwrite)
 
 
 def write_text_atomically(path: Path, value: str, *, overwrite: bool) -> Path:
-    """Atomically write one private UTF-8 text artifact."""
-
     destination = Path(path)
     parent = destination.parent
     if parent.exists() and (parent.is_symlink() or not parent.is_dir()):
@@ -287,10 +268,9 @@ def write_text_atomically(path: Path, value: str, *, overwrite: bool) -> Path:
     parent.mkdir(parents=True, exist_ok=True)
     destination = parent.resolve(strict=True) / destination.name
     if destination.is_symlink():
-        raise OutputSafetyError("refusing to replace a text output symlink")
+        raise OutputSafetyError("refusing to replace an output symlink")
     if destination.exists() and not overwrite:
         raise OutputConflictError(f"output already exists: {destination}")
-
     descriptor, temporary_name = tempfile.mkstemp(prefix=f".{destination.name}.", dir=str(parent))
     temporary = Path(temporary_name)
     try:
@@ -301,7 +281,7 @@ def write_text_atomically(path: Path, value: str, *, overwrite: bool) -> Path:
             os.fsync(handle.fileno())
         os.replace(temporary, destination)
     except OSError as exc:
-        raise OutputSafetyError(f"failed to write text output: {exc}") from exc
+        raise OutputSafetyError(f"failed to write text output: {type(exc).__name__}") from exc
     finally:
         if temporary.exists():
             temporary.unlink()

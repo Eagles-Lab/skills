@@ -1,83 +1,61 @@
-from copy import deepcopy
+from __future__ import annotations
 
 import pytest
 from pydantic import ValidationError
 
-from sre_resume_analyzer.models import SCHEMA_VERSION, Resume
+from sre_resume_analyzer.models import Resume
 
 
-def canonical_resume():
-    return {
-        "resume_id": "candidate_001",
-        "basic_info": {
-            "name": "Candidate",
-            "school": "Example University",
-            "major": "Computer Science",
-            "degree": "Bachelor",
-            "graduation_year": 2026,
-            "contact": {"phone": "000-0000", "email": "candidate@example.invalid"},
-        },
-        "internships": [],
-        "projects": [],
-        "skills": {
-            "programming_languages": ["Python"],
-            "monitoring_tools": ["Prometheus"],
-            "container_tech": ["Kubernetes"],
-            "cloud_platforms": ["AWS"],
-            "cicd_tools": ["GitHub Actions"],
-        },
-    }
+def test_empty_canonical_is_valid_and_normalized():
+    resume = Resume.model_validate({})
+    assert resume.basic_info.name is None
+    assert resume.internships == []
+    assert resume.projects == []
+    assert resume.skills.ai_tools == []
 
 
-def test_canonical_v3_model_accepts_exact_contract():
-    resume = Resume.model_validate(canonical_resume())
+def test_nullable_top_level_fact_groups_normalize_to_empty_defaults():
+    resume = Resume.model_validate(
+        {"basic_info": None, "internships": None, "projects": None, "skills": None}
+    )
+    assert resume.basic_info.name is None
+    assert resume.internships == []
+    assert resume.projects == []
+    assert resume.skills.ai_tools == []
 
-    assert resume.resume_id == "candidate_001"
-    assert resume.basic_info.graduation_year == 2026
-    assert SCHEMA_VERSION == "3.0"
+
+def test_blank_optional_text_and_null_lists_are_normalized():
+    resume = Resume.model_validate(
+        {
+            "basic_info": {"name": "  ", "school": " 示例大学 "},
+            "skills": {"programming_languages": None, "ai_tools": [" Cursor "]},
+            "projects": [{"name": " ", "tech_stack": None, "achievements": None}],
+        }
+    )
+    assert resume.basic_info.name is None
+    assert resume.basic_info.school == "示例大学"
+    assert resume.skills.programming_languages == []
+    assert resume.skills.ai_tools == ["Cursor"]
+    assert resume.projects[0].name is None
 
 
 @pytest.mark.parametrize(
-    "mutator",
+    "value",
     [
-        lambda data: data["projects"].append(
-            {
-                "name": "legacy",
-                "position": "owner",
-                "duration": "2025",
-                "description": "legacy fields",
-                "technologies": ["Prometheus"],
-                "achievements": [],
-            }
-        ),
-        lambda data: data.update({"skills": ["Prometheus"]}),
-        lambda data: data.update({"unknown": True}),
-        lambda data: data.update({"resume_id": "../escape"}),
-        lambda data: data["basic_info"].update({"graduation_year": "2026"}),
+        {"position": "SRE"},
+        {"skills": ["Python"]},
+        {"projects": [{"technologies": ["Docker"]}]},
+        {"basic_info": {"graduation_year": "2027"}},
+        {"internships": {}},
+        {"skills": {"programming_languages": "Python"}},
     ],
 )
-def test_v2_extra_and_non_strict_fields_are_rejected(mutator):
-    value = deepcopy(canonical_resume())
-    mutator(value)
-
+def test_v2_unknown_and_wrong_types_fail_closed(value):
     with pytest.raises(ValidationError):
         Resume.model_validate(value)
 
 
-def test_generated_json_schema_forbids_extra_fields():
-    schema = Resume.model_json_schema()
-
-    assert schema["additionalProperties"] is False
-    assert schema["$defs"]["Project"]["additionalProperties"] is False
-    assert set(schema["required"]) == {"basic_info", "internships", "projects", "skills"}
-
-
-def test_nested_strings_are_trimmed_and_empty_list_items_are_rejected():
-    value = canonical_resume()
-    value["skills"]["monitoring_tools"] = ["  Prometheus  "]
-    resume = Resume.model_validate(value)
-    assert resume.skills.monitoring_tools == ["Prometheus"]
-
-    value["skills"]["monitoring_tools"] = ["   "]
+@pytest.mark.parametrize("resume_id", ["../x", "/tmp/x", "a/b", "a\x00b", "", "a" * 65])
+def test_resume_id_remains_strict_internal_identifier(resume_id):
     with pytest.raises(ValidationError):
-        Resume.model_validate(value)
+        Resume.model_validate({"resume_id": resume_id})

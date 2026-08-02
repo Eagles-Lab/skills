@@ -1,246 +1,92 @@
-import shutil
+from __future__ import annotations
+
+import json
 from pathlib import Path
 
 import pytest
 
-from sre_resume_analyzer import calibration, cli, scoring
-from sre_resume_analyzer.errors import (
-    AnalyzerError,
-    InputValidationError,
-    OutputSafetyError,
-    PDFExtractionError,
-)
-
-FIXTURES = Path(__file__).parent / "fixtures"
+from sre_resume_analyzer.cli import analyze_main, batch_main, extract_main
+from sre_resume_analyzer.errors import ExitCode
 
 
-def test_analyze_cli_success(monkeypatch, capsys, tmp_path):
-    class FakeAnalyzer:
-        def __init__(self, output_dir):
-            assert output_dir == tmp_path / "out"
-
-        def analyze(self, *args, **kwargs):
-            return {"score": str(tmp_path / "out" / "id" / "score.json")}
-
-    monkeypatch.setattr(cli, "ResumeAnalyzer", FakeAnalyzer)
-    code = cli.analyze_main(
-        ["--extracted", str(tmp_path / "resume.json"), "--output-dir", str(tmp_path / "out")]
-    )
-
-    assert code == 0
-    assert '"status": "success"' in capsys.readouterr().out
+def write_json(path: Path, value: object) -> Path:
+    path.write_text(json.dumps(value, ensure_ascii=False), encoding="utf-8")
+    return path
 
 
-def test_analyze_cli_exit_categories(monkeypatch, tmp_path):
-    class FakeAnalyzer:
-        def __init__(self, output_dir):
-            pass
-
-        def analyze(self, *args, **kwargs):
-            raise InputValidationError("invalid schema")
-
-    monkeypatch.setattr(cli, "ResumeAnalyzer", FakeAnalyzer)
-    args = ["--extracted", "bad.json", "--output-dir", str(tmp_path / "out")]
-    assert cli.analyze_main(args) == 2
-
-    FakeAnalyzer.analyze = lambda self, *args, **kwargs: (_ for _ in ()).throw(
-        OutputSafetyError("unsafe")
-    )
-    assert cli.analyze_main(args) == 5
-
-
-def test_extract_cli_never_prints_raw_text(monkeypatch, capsys, tmp_path):
-    def fake_extract(pdf, output, **kwargs):
-        output.write_text("TOP_SECRET_RAW_TEXT", encoding="utf-8")
-        return output
-
-    monkeypatch.setattr(cli, "write_raw_extraction", fake_extract)
-    output = tmp_path / "raw_extraction.json"
-    code = cli.extract_main([str(tmp_path / "resume.pdf"), "--output", str(output)])
+def test_analyze_cli_success_stdout_has_root_and_count_but_no_name(tmp_path: Path, capsys):
+    source = write_json(tmp_path / "resume.json", {"basic_info": {"name": "秘密姓名"}})
+    output = tmp_path / "run"
+    code = analyze_main(["--extracted", str(source), "--output-dir", str(output)])
     captured = capsys.readouterr()
+    assert code == ExitCode.SUCCESS
+    payload = json.loads(captured.out)
+    assert payload == {"status": "success", "output_dir": str(output), "successful": 1}
+    assert "秘密姓名" not in captured.out + captured.err
 
-    assert code == 0
-    assert "TOP_SECRET_RAW_TEXT" not in captured.out
-    assert "TOP_SECRET_RAW_TEXT" not in captured.err
+
+def test_schema_error_exit_two_and_no_output(tmp_path: Path, capsys):
+    source = write_json(tmp_path / "bad.json", {"position": "SRE"})
+    output = tmp_path / "run"
+    assert analyze_main(["--extracted", str(source), "--output-dir", str(output)]) == 2
+    assert "input error" in capsys.readouterr().err
+    assert not output.exists()
 
 
-def test_batch_cli_returns_partial_failure(monkeypatch, tmp_path):
-    class FakeBatch:
-        def __init__(self, *args, **kwargs):
-            pass
+def test_output_conflict_exit_five(tmp_path: Path, capsys):
+    source = write_json(tmp_path / "resume.json", {})
+    output = tmp_path / "run"
+    assert analyze_main(["--extracted", str(source), "--output-dir", str(output)]) == 0
+    assert analyze_main(["--extracted", str(source), "--output-dir", str(output)]) == 5
+    assert "output error" in capsys.readouterr().err
 
-        def process_directory(self, *args, **kwargs):
-            return {"total": 2, "successful": 1, "failed": 1}
 
-    monkeypatch.setattr(cli, "BatchProcessor", FakeBatch)
+def test_overwrite_replaces_complete_run(tmp_path: Path):
+    source = write_json(tmp_path / "resume.json", {})
+    output = tmp_path / "run"
+    assert analyze_main(["--extracted", str(source), "--output-dir", str(output)]) == 0
+    (output / "stale").write_text("stale")
     assert (
-        cli.batch_main(["--input-dir", str(tmp_path), "--output-dir", str(tmp_path / "out")]) == 3
+        analyze_main(["--extracted", str(source), "--output-dir", str(output), "--overwrite"]) == 0
     )
+    assert not (output / "stale").exists()
 
 
-def test_calibration_cli_scores_canonical_resumes_in_one_step(monkeypatch, tmp_path):
-    resumes = tmp_path / "resumes"
-    resumes.mkdir()
-    shutil.copy(FIXTURES / "runtime_complete.json", resumes / "one.json")
-    reviews = tmp_path / "reviews.csv"
-    reviews.write_text("private reviews are mocked", encoding="utf-8")
-
-    class FakeCalculator:
-        def __init__(self, config=None):
-            self.config = config
-
-        def calculate(self, resume):
-            return {"total_score": 8.0}
-
-    class FakeReport:
-        passed = True
-
-        def model_dump(self, mode):
-            return {"passed": True, "sample_count": 1}
-
-    monkeypatch.setattr(scoring, "ScoreCalculator", FakeCalculator)
-    monkeypatch.setattr(
-        calibration, "evaluate_calibration_csv", lambda *args, **kwargs: FakeReport()
-    )
-    monkeypatch.setattr(calibration, "render_calibration_markdown", lambda report: "PASS")
-    output = tmp_path / "calibration"
-
-    code = cli.calibrate_main(
-        [
-            "--resumes",
-            str(resumes),
-            "--reviews",
-            str(reviews),
-            "--output-dir",
-            str(output),
-        ]
-    )
-
-    assert code == 0
-    assert (output / "calibration_report.json").exists()
-    assert (output / "calibration_report.md").exists()
+def test_batch_partial_exit_three_and_privacy_safe_stdout(tmp_path: Path, capsys):
+    inputs = tmp_path / "inputs"
+    inputs.mkdir()
+    write_json(inputs / "good.json", {"basic_info": {"name": "秘密姓名"}})
+    write_json(inputs / "bad.json", {"skills": ["Python"]})
+    output = tmp_path / "run"
+    code = batch_main(["--input-dir", str(inputs), "--output-dir", str(output), "--parallel", "3"])
+    captured = capsys.readouterr()
+    assert code == ExitCode.PARTIAL_BATCH_FAILURE
+    payload = json.loads(captured.out)
+    assert payload["successful"] == 1
+    assert payload["failed"] == 1
+    assert payload["output_dir"] == str(output)
+    assert "秘密姓名" not in captured.out + captured.err
 
 
-@pytest.mark.parametrize(
-    ("error", "code"),
-    [(AnalyzerError("analysis"), 1), (KeyboardInterrupt(), 130), (RuntimeError("x"), 1)],
-)
-def test_analyze_cli_remaining_error_boundaries(monkeypatch, error, code):
-    class FakeAnalyzer:
-        def __init__(self, output_dir):
-            pass
-
-        def analyze(self, *args, **kwargs):
-            raise error
-
-    monkeypatch.setattr(cli, "ResumeAnalyzer", FakeAnalyzer)
-    assert cli.analyze_main(["--extracted", "resume.json", "--output-dir", "processing"]) == code
+def test_batch_empty_directory_is_successful_empty_run(tmp_path: Path):
+    inputs = tmp_path / "inputs"
+    inputs.mkdir()
+    output = tmp_path / "run"
+    assert batch_main(["--input-dir", str(inputs), "--output-dir", str(output)]) == 0
+    assert json.loads((output / "batch_summary.json").read_text())["total"] == 0
 
 
-@pytest.mark.parametrize(
-    ("error", "code"),
-    [
-        (OutputSafetyError("output"), 5),
-        (PDFExtractionError("pdf"), 4),
-        (KeyboardInterrupt(), 130),
-        (RuntimeError("x"), 1),
-    ],
-)
-def test_extract_cli_error_boundaries(monkeypatch, error, code):
-    def fail(*args, **kwargs):
-        raise error
-
-    monkeypatch.setattr(cli, "write_raw_extraction", fail)
-    assert cli.extract_main(["resume.pdf", "--output", "raw_extraction.json"]) == code
+def test_pdf_extract_error_exit_four_without_raw_output(tmp_path: Path, capsys):
+    source = tmp_path / "broken.pdf"
+    source.write_bytes(b"not a pdf")
+    output = tmp_path / "raw_extraction.json"
+    assert extract_main([str(source), "--output", str(output)]) == 4
+    assert "PDF extraction error" in capsys.readouterr().err
+    assert not output.exists()
 
 
-@pytest.mark.parametrize(
-    ("error", "code"),
-    [
-        (InputValidationError("input"), 2),
-        (OutputSafetyError("output"), 5),
-        (KeyboardInterrupt(), 130),
-        (RuntimeError("x"), 1),
-    ],
-)
-def test_batch_cli_error_boundaries(monkeypatch, tmp_path, error, code):
-    class FakeBatch:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        def process_directory(self, *args, **kwargs):
-            raise error
-
-    monkeypatch.setattr(cli, "BatchProcessor", FakeBatch)
-    assert (
-        cli.batch_main(["--input-dir", str(tmp_path), "--output-dir", str(tmp_path / "out")])
-        == code
-    )
-
-
-def test_batch_cli_full_success(monkeypatch, tmp_path):
-    class FakeBatch:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        def process_directory(self, *args, **kwargs):
-            return {"total": 1, "successful": 1, "failed": 0}
-
-    monkeypatch.setattr(cli, "BatchProcessor", FakeBatch)
-    assert (
-        cli.batch_main(["--input-dir", str(tmp_path), "--output-dir", str(tmp_path / "out")]) == 0
-    )
-
-
-def test_cli_positive_integer_and_calibration_input_boundaries(tmp_path):
-    assert cli._positive_integer("2") == 2
-    with pytest.raises(Exception, match="at least 1"):
-        cli._positive_integer("0")
-    assert (
-        cli.calibrate_main(
-            [
-                "--resumes",
-                str(tmp_path / "missing"),
-                "--reviews",
-                str(tmp_path / "reviews.csv"),
-                "--output-dir",
-                str(tmp_path / "out"),
-            ]
-        )
-        == 2
-    )
-
-    resumes = tmp_path / "resumes"
-    resumes.mkdir()
-    shutil.copy(FIXTURES / "runtime_minimal.json", resumes / "one.json")
-    assert (
-        cli.calibrate_main(
-            [
-                "--resumes",
-                str(resumes),
-                "--reviews",
-                str(tmp_path / "reviews.csv"),
-                "--output-dir",
-                str(tmp_path / "out"),
-                "--candidate-config",
-                str(tmp_path / "missing-config.yaml"),
-            ]
-        )
-        == 2
-    )
-
-    empty = tmp_path / "empty"
-    empty.mkdir()
-    assert (
-        cli.calibrate_main(
-            [
-                "--resumes",
-                str(empty),
-                "--reviews",
-                str(tmp_path / "reviews.csv"),
-                "--output-dir",
-                str(tmp_path / "out"),
-            ]
-        )
-        == 2
-    )
+@pytest.mark.parametrize("main", [analyze_main, batch_main, extract_main])
+def test_help_exits_success(main):
+    with pytest.raises(SystemExit) as error:
+        main(["--help"])
+    assert error.value.code == 0

@@ -15,43 +15,72 @@
           "default": null
         },
         "degree": {
-          "maxLength": 128,
-          "minLength": 1,
-          "title": "Degree",
-          "type": "string"
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Degree"
         },
         "graduation_year": {
-          "maximum": 2200,
-          "minimum": 1900,
-          "title": "Graduation Year",
-          "type": "integer"
+          "anyOf": [
+            {
+              "maximum": 2200,
+              "minimum": 1900,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Graduation Year"
         },
         "major": {
-          "maxLength": 256,
-          "minLength": 1,
-          "title": "Major",
-          "type": "string"
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Major"
         },
         "name": {
-          "maxLength": 256,
-          "minLength": 1,
-          "title": "Name",
-          "type": "string"
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
         },
         "school": {
-          "maxLength": 512,
-          "minLength": 1,
-          "title": "School",
-          "type": "string"
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "School"
         }
       },
-      "required": [
-        "name",
-        "school",
-        "major",
-        "degree",
-        "graduation_year"
-      ],
       "title": "BasicInfo",
       "type": "object"
     },
@@ -59,22 +88,32 @@
       "additionalProperties": false,
       "properties": {
         "email": {
-          "maxLength": 320,
-          "minLength": 1,
-          "title": "Email",
-          "type": "string"
+          "anyOf": [
+            {
+              "maxLength": 320,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Email"
         },
         "phone": {
-          "maxLength": 128,
-          "minLength": 1,
-          "title": "Phone",
-          "type": "string"
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Phone"
         }
       },
-      "required": [
-        "phone",
-        "email"
-      ],
       "title": "Contact",
       "type": "object"
     },
@@ -90,28 +129,56 @@
           "type": "array"
         },
         "company": {
-          "maxLength": 512,
-          "minLength": 1,
-          "title": "Company",
-          "type": "string"
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Company"
         },
         "description": {
-          "maxLength": 20000,
-          "minLength": 1,
-          "title": "Description",
-          "type": "string"
+          "anyOf": [
+            {
+              "maxLength": 20000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
         },
         "duration": {
-          "maxLength": 256,
-          "minLength": 1,
-          "title": "Duration",
-          "type": "string"
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration"
         },
         "role": {
-          "maxLength": 256,
-          "minLength": 1,
-          "title": "Role",
-          "type": "string"
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Role"
         },
         "tech_stack": {
           "items": {
@@ -122,14 +189,6 @@
           "type": "array"
         }
       },
-      "required": [
-        "company",
-        "role",
-        "duration",
-        "description",
-        "tech_stack",
-        "achievements"
-      ],
       "title": "Internship",
       "type": "object"
     },
@@ -145,28 +204,56 @@
           "type": "array"
         },
         "description": {
-          "maxLength": 20000,
-          "minLength": 1,
-          "title": "Description",
-          "type": "string"
+          "anyOf": [
+            {
+              "maxLength": 20000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
         },
         "duration": {
-          "maxLength": 256,
-          "minLength": 1,
-          "title": "Duration",
-          "type": "string"
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration"
         },
         "name": {
-          "maxLength": 512,
-          "minLength": 1,
-          "title": "Name",
-          "type": "string"
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
         },
         "role": {
-          "maxLength": 256,
-          "minLength": 1,
-          "title": "Role",
-          "type": "string"
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Role"
         },
         "tech_stack": {
           "items": {
@@ -177,20 +264,20 @@
           "type": "array"
         }
       },
-      "required": [
-        "name",
-        "role",
-        "duration",
-        "description",
-        "tech_stack",
-        "achievements"
-      ],
       "title": "Project",
       "type": "object"
     },
     "Skills": {
       "additionalProperties": false,
       "properties": {
+        "ai_tools": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Ai Tools",
+          "type": "array"
+        },
         "cicd_tools": {
           "items": {
             "minLength": 1,
@@ -232,13 +319,6 @@
           "type": "array"
         }
       },
-      "required": [
-        "programming_languages",
-        "monitoring_tools",
-        "container_tech",
-        "cloud_platforms",
-        "cicd_tools"
-      ],
       "title": "Skills",
       "type": "object"
     }
@@ -247,21 +327,42 @@
   "description": "The only accepted structured input shape for analyzer v3.",
   "properties": {
     "basic_info": {
-      "$ref": "#/$defs/BasicInfo"
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BasicInfo"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "internships": {
-      "items": {
-        "$ref": "#/$defs/Internship"
-      },
-      "title": "Internships",
-      "type": "array"
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/Internship"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Internships"
     },
     "projects": {
-      "items": {
-        "$ref": "#/$defs/Project"
-      },
-      "title": "Projects",
-      "type": "array"
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/Project"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Projects"
     },
     "resume_id": {
       "anyOf": [
@@ -279,15 +380,16 @@
       "title": "Resume Id"
     },
     "skills": {
-      "$ref": "#/$defs/Skills"
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Skills"
+        },
+        {
+          "type": "null"
+        }
+      ]
     }
   },
-  "required": [
-    "basic_info",
-    "internships",
-    "projects",
-    "skills"
-  ],
   "title": "Resume",
   "type": "object"
 }

@@ -1,5 +1,6 @@
+from __future__ import annotations
+
 import json
-import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -7,87 +8,114 @@ import pytest
 
 from sre_resume_analyzer.analyzer import ResumeAnalyzer
 from sre_resume_analyzer.batch import BatchPreflightError, BatchProcessor
+from sre_resume_analyzer.errors import OutputConflictError
 
-FIXTURES = Path(__file__).parent / "fixtures"
-FIXED_TIME = datetime(2026, 8, 2, tzinfo=UTC)
-
-
-class FakeCalculator:
-    def calculate(self, resume):
-        return json.loads((FIXTURES / "runtime_score.json").read_text(encoding="utf-8"))
+FIXED = datetime(2026, 8, 2, tzinfo=UTC)
 
 
-def _factory(instances):
-    def create(root):
-        analyzer = ResumeAnalyzer(root, calculator=FakeCalculator(), clock=lambda: FIXED_TIME)
-        instances.append(analyzer)
-        return analyzer
-
-    return create
+def write(path: Path, value: object) -> None:
+    path.write_text(json.dumps(value, ensure_ascii=False), encoding="utf-8")
 
 
-def test_batch_is_sorted_partial_and_uses_isolated_analyzers(tmp_path):
-    source = tmp_path / "input"
-    source.mkdir()
-    shutil.copy(FIXTURES / "runtime_complete.json", source / "b.json")
-    shutil.copy(FIXTURES / "runtime_minimal.json", source / "a.json")
-    (source / "c.json").write_text("{}", encoding="utf-8")
-    instances = []
-    processor = BatchProcessor(
-        tmp_path / "out",
-        max_workers=3,
-        analyzer_factory=_factory(instances),
-        clock=lambda: FIXED_TIME,
+def processor(output: Path, workers: int = 3, overwrite: bool = False) -> BatchProcessor:
+    return BatchProcessor(
+        output,
+        max_workers=workers,
+        overwrite=overwrite,
+        clock=lambda: FIXED,
+        analyzer_factory=lambda root: ResumeAnalyzer(root, clock=lambda: FIXED),
     )
 
-    summary = processor.process_directory(source)
 
-    assert summary["total"] == 3
-    assert summary["successful"] == 2
+def test_partial_batch_atomically_publishes_successes_and_redacted_failure(tmp_path: Path):
+    inputs = tmp_path / "inputs"
+    inputs.mkdir()
+    write(inputs / "candidate-a.json", {"basic_info": {"name": "张三"}})
+    write(inputs / "candidate-secret-name.json", {"skills": ["Python"]})
+    output = tmp_path / "run"
+    summary = processor(output).process_directory(inputs)
+    assert summary["total"] == 2
+    assert summary["successful"] == 1
     assert summary["failed"] == 1
-    assert [item["file"] for item in summary["results"]] == sorted(
-        item["file"] for item in summary["results"]
-    )
-    assert len(instances) == 2
-    assert len({id(instance) for instance in instances}) == 2
+    failed = next(item for item in summary["results"] if item["status"] == "failed")
+    assert set(failed) == {"input_sha256", "status", "error_category"}
+    assert "candidate-secret-name" not in json.dumps(summary)
+    assert (output / "batch_summary.json").is_file()
+    assert len(list((output / "resume_analysis").iterdir())) == 1
+    assert len(list((output / "interview_questions").iterdir())) == 1
 
 
-def test_reusing_processor_does_not_accumulate_state(tmp_path):
-    source = tmp_path / "input"
-    source.mkdir()
-    shutil.copy(FIXTURES / "runtime_minimal.json", source / "a.json")
-    processor = BatchProcessor(
-        tmp_path / "out",
-        overwrite=True,
-        analyzer_factory=_factory([]),
-        clock=lambda: FIXED_TIME,
-    )
-
-    first = processor.process_directory(source)
-    second = processor.process_directory(source)
-
-    assert first["total"] == second["total"] == 1
-    assert first["results"] == second["results"]
+def test_duplicate_content_fails_before_workers_and_writes_nothing(tmp_path: Path):
+    inputs = tmp_path / "inputs"
+    inputs.mkdir()
+    content = {"basic_info": {"name": "张三"}}
+    write(inputs / "a.json", content)
+    write(inputs / "b.json", content)
+    output = tmp_path / "run"
+    with pytest.raises(BatchPreflightError, match="duplicate input"):
+        processor(output).process_directory(inputs)
+    assert not output.exists()
 
 
-def test_duplicate_ids_abort_before_workers_start(tmp_path):
-    source = tmp_path / "input"
-    source.mkdir()
-    data = json.loads((FIXTURES / "runtime_complete.json").read_text(encoding="utf-8"))
-    (source / "a.json").write_text(json.dumps(data), encoding="utf-8")
-    data["basic_info"]["name"] = "different"
-    (source / "b.json").write_text(json.dumps(data), encoding="utf-8")
-    instances = []
-    processor = BatchProcessor(
-        tmp_path / "out", analyzer_factory=_factory(instances), clock=lambda: FIXED_TIME
-    )
-
-    with pytest.raises(BatchPreflightError, match="duplicate"):
-        processor.process_directory(source)
-    assert instances == []
-    assert not (tmp_path / "out" / "batch_summary.json").exists()
+def test_existing_run_conflicts_before_analysis(tmp_path: Path):
+    inputs = tmp_path / "inputs"
+    inputs.mkdir()
+    write(inputs / "a.json", {})
+    output = tmp_path / "run"
+    processor(output).process_directory(inputs)
+    with pytest.raises(OutputConflictError):
+        processor(output).process_directory(inputs)
 
 
-def test_parallelism_must_be_positive(tmp_path):
-    with pytest.raises(ValueError, match="at least 1"):
-        BatchProcessor(tmp_path, max_workers=0)
+def test_same_processor_instance_does_not_accumulate_results(tmp_path: Path):
+    inputs = tmp_path / "inputs"
+    inputs.mkdir()
+    write(inputs / "a.json", {})
+    instance = processor(tmp_path / "run", overwrite=True)
+    first = instance.process_directory(inputs)
+    first_result_count = len(first["results"])
+    write(inputs / "b.json", {"basic_info": {"name": "李四"}})
+    second = instance.process_directory(inputs)
+    assert first_result_count == 1
+    assert second["total"] == 2
+    assert len(second["results"]) == 2
+
+
+def normalized_files(root: Path) -> dict[str, object]:
+    values: dict[str, object] = {}
+    for path in sorted(root.rglob("*")):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(root).as_posix()
+        if path.suffix == ".json":
+            value = json.loads(path.read_text())
+            if isinstance(value, dict):
+                value.pop("generated_at", None)
+            values[relative] = value
+        else:
+            values[relative] = path.read_text().replace("2026-08-02T00:00:00Z", "TIME")
+    return values
+
+
+def test_parallelism_one_three_sixteen_produces_same_results(tmp_path: Path):
+    inputs = tmp_path / "inputs"
+    inputs.mkdir()
+    for index in range(12):
+        write(
+            inputs / f"{index:02}.json",
+            {
+                "basic_info": {"name": f"候选人{index}"},
+                "projects": [{"description": f"实现 Python 自动化工具 {index}"}],
+            },
+        )
+    outputs = []
+    for workers in (1, 3, 16):
+        root = tmp_path / f"run-{workers}"
+        processor(root, workers=workers).process_directory(inputs)
+        outputs.append(normalized_files(root))
+    assert outputs[0] == outputs[1] == outputs[2]
+
+
+def test_invalid_worker_count():
+    with pytest.raises(ValueError):
+        BatchProcessor(Path("unused"), max_workers=0)

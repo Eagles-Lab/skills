@@ -49,7 +49,7 @@ def analyze_main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--seed", help="explicit deterministic interview-question seed")
     args = parser.parse_args(argv)
     try:
-        outputs = ResumeAnalyzer(args.output_dir).analyze(
+        ResumeAnalyzer(args.output_dir).analyze(
             args.extracted,
             include_contact=args.include_contact,
             overwrite=args.overwrite,
@@ -70,7 +70,12 @@ def analyze_main(argv: Optional[Sequence[str]] = None) -> int:
         _print_error("internal error", type(exc).__name__)
         return int(ExitCode.INTERNAL_ERROR)
 
-    print(json.dumps({"status": "success", "outputs": outputs}, sort_keys=True))
+    print(
+        json.dumps(
+            {"status": "success", "output_dir": str(args.output_dir), "successful": 1},
+            sort_keys=True,
+        )
+    )
     return int(ExitCode.SUCCESS)
 
 
@@ -144,7 +149,7 @@ def batch_main(argv: Optional[Sequence[str]] = None) -> int:
                 "total": summary["total"],
                 "successful": summary["successful"],
                 "failed": summary["failed"],
-                "summary": str(args.output_dir / "batch_summary.json"),
+                "output_dir": str(args.output_dir),
             },
             sort_keys=True,
         )
