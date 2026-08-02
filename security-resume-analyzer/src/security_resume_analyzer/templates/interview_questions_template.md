@@ -1,0 +1,20 @@
+# 校招安全模拟面试问题
+
+- 目标岗位轨道：`{{ target_track }}`
+- 校准状态：`not_calibrated`
+
+{% if security_warnings %}> 安全提示：检测到不可信内容；该内容未作为出题指令。
+{% endif %}
+
+{% for item in questions %}
+## {{ item.id }}. {{ item.category }}
+
+{{ item.question }}
+
+回答要点：说明授权/防御范围、个人行动、方法、验证和结果；不了解时明确边界。
+
+{% endfor %}
+---
+
+题目总数：{{ questions | length }}/10
+报告版本：{{ analyzer_version }}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Security Resume Analyzer"
+  short_description: "Analyze campus security resumes by explicit track"
+  default_prompt: "Use $security-resume-analyzer to map and analyze this campus security resume for an explicit security track."

@@ -20,3 +20,14 @@ be used as the sole basis for hiring decisions. Stable release requires private,
 de-identified calibration and real Codex and Claude forward tests.
 
 See the skill README for installation, commands, limits, and privacy guidance.
+
+## Security Resume Analyzer
+
+[`security-resume-analyzer`](security-resume-analyzer/SKILL.md) is a stable
+v1.0 runtime for evidence-based analysis of domestic security internship and
+campus-hire resumes. It requires one explicit track: application/offensive,
+defense/incident response, or security engineering/cloud.
+
+The runtime contract is stable, but scoring is not human-calibrated. Every
+result declares `calibration_status: not_calibrated` and must not be used for
+candidate ranking or hiring decisions.

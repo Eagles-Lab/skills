@@ -1,0 +1,69 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "security-resume-analyzer"
+version = "1.0.0"
+description = "Deterministic evidence analyzer for Chinese campus security resumes"
+requires-python = "==3.13.13"
+dependencies = [
+  "Jinja2>=3.1,<4",
+  "pdfplumber>=0.11.10,<0.12",
+  "pydantic>=2.10,<3",
+]
+
+[project.optional-dependencies]
+dev = [
+  "bandit>=1.8,<2",
+  "mypy>=1.13,<2",
+  "pip-audit>=2.9,<3",
+  "pytest>=8,<9",
+  "pytest-cov>=6,<8",
+  "ruff>=0.11,<1",
+]
+
+[project.scripts]
+analyze-security-resume = "security_resume_analyzer.cli:analyze_main"
+batch-analyze-security = "security_resume_analyzer.cli:batch_main"
+calibrate-security-scoring = "security_resume_analyzer.cli:calibrate_main"
+extract-security-resume-text = "security_resume_analyzer.cli:extract_main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+security_resume_analyzer = ["templates/*.md"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-config --strict-markers"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["security_resume_analyzer"]
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true
+skip_covered = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+ignore = ["E501", "RUF001", "UP035"]
+
+[tool.mypy]
+python_version = "3.13"
+check_untyped_defs = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+packages = ["security_resume_analyzer"]
