@@ -44,6 +44,7 @@
     "monitoring_tools": ["Prometheus", "Grafana", "Alertmanager"],
     "container_tech": ["Docker", "Kubernetes", "Helm"],
     "cloud_platforms": ["AWS"],
-    "cicd_tools": ["GitHub Actions", "Terraform"]
+    "cicd_tools": ["GitHub Actions", "Terraform"],
+    "ai_tools": ["LLM", "RAG", "AIOps"]
   }
 }

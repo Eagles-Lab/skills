@@ -1,21 +1,30 @@
-# SRE 结构化面试题
+# 校招 SRE 模拟面试问题
 
 {% if security_warnings %}
-> 安全提示：{{ security_warnings | join('、') }}。可疑原文未进入评分证据或报告上下文。
+> 安全提示：检测到疑似指令性内容；该内容未作为出题指令。
 {% endif %}
 
 ## 候选人信息
 
 | 项目 | 内容 |
 | --- | --- |
+{% if basic_info.name %}
 | 姓名 | {{ basic_info.name }} |
+{% endif %}
+{% if basic_info.school %}
 | 学校 | {{ basic_info.school }} |
+{% endif %}
+{% if basic_info.major %}
 | 专业 | {{ basic_info.major }} |
-| 简历 ID | {{ resume_id }} |
+{% endif %}
 | 生成时间 | {{ generated_at }} |
 {% if contact %}
+{% if contact.email %}
 | 邮箱 | {{ contact.email }} |
+{% endif %}
+{% if contact.phone %}
 | 电话 | {{ contact.phone }} |
+{% endif %}
 {% endif %}
 
 ## 面试题
@@ -45,4 +54,4 @@
 ---
 
 题目总数：{{ questions | length }}/10
-报告版本：{{ analyzer_version }}
+报告版本：{{ analyzer_version }}（experimental）

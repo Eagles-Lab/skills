@@ -1,170 +1,132 @@
-# Canonical resume schema 3.0
+# Canonical resume schema v3
 
-`Resume` is the only accepted structured analyzer input. Pydantic validates it
-in strict mode with unknown fields forbidden and surrounding string whitespace
-removed. Empty or whitespace-only strings are rejected, including strings
-inside lists. v2 input is intentionally rejected; no implicit migration
-exists.
+This is the sole structured input contract for Python scoring. The generated
+machine-readable form is [extracted_resume.schema.json](extracted_resume.schema.json).
 
-The generated machine-readable contract is
-`references/extracted_resume.schema.json`.
+## Normalized shape
 
-## Top-level object
-
-| Field | Type | Required | Rules |
-|---|---|---:|---|
-| `resume_id` | string or null | No | `[A-Za-z0-9_-]{1,64}` |
-| `basic_info` | object | Yes | Exact `BasicInfo` shape |
-| `internships` | array | Yes | May be empty; items are `Internship` |
-| `projects` | array | Yes | May be empty; items are `Project` |
-| `skills` | object | Yes | Exact `Skills` shape |
-
-Reject unknown top-level fields. When `resume_id` is absent or null, let the CLI
-derive a stable safe identifier from the input hash and a sanitized name slug.
-
-## Basic information
-
-`basic_info` requires:
-
-| Field | Type | Constraints |
-|---|---|---|
-| `name` | string | 1–256 characters |
-| `school` | string | 1–512 characters |
-| `major` | string | 1–256 characters |
-| `degree` | string | 1–128 characters |
-| `graduation_year` | integer | 1900–2200 |
-| `contact` | object or null | Optional |
-
-When present, `contact` requires both:
-
-| Field | Type | Constraints |
-|---|---|---|
-| `phone` | string | 1–128 characters |
-| `email` | string | 1–320 characters |
-
-Contact fields are stored for authorized reporting only. They never contribute
-to scores. Omit `contact` rather than inventing or partially guessing it.
-
-## Internships
-
-Every `internships` item requires:
-
-| Field | Type | Constraints |
-|---|---|---|
-| `company` | string | 1–512 characters |
-| `role` | string | 1–256 characters |
-| `duration` | string | 1–256 characters |
-| `description` | string | 1–20,000 characters |
-| `tech_stack` | array of strings | Required; may be empty |
-| `achievements` | array of strings | Required; may be empty |
-
-Use the exact key `role`, not v2 `position`. Use the exact key `tech_stack`, not
-v2 `technologies`. Keep outcomes in the internship that explicitly states them.
-
-## Projects
-
-Every `projects` item requires:
-
-| Field | Type | Constraints |
-|---|---|---|
-| `name` | string | 1–512 characters |
-| `role` | string | 1–256 characters |
-| `duration` | string | 1–256 characters |
-| `description` | string | 1–20,000 characters |
-| `tech_stack` | array of strings | Required; may be empty |
-| `achievements` | array of strings | Required; may be empty |
-
-Do not merge separate projects merely because they use the same technology.
-Evidence identity and AI outcome attribution depend on record boundaries.
-
-## Skills
-
-`skills` requires five arrays, each of which may be empty:
-
-- `programming_languages`
-- `monitoring_tools`
-- `container_tech`
-- `cloud_platforms`
-- `cicd_tools`
-
-Reject the v2 list form of `skills`. A skill-list entry is a mention only; it
-does not establish implementation, ownership, production use, or outcome.
-
-## Minimal valid example
-
-```json
-{
-  "basic_info": {
-    "name": "Candidate Example",
-    "school": "Example University",
-    "major": "Computer Science",
-    "degree": "Bachelor",
-    "graduation_year": 2027
-  },
-  "internships": [],
-  "projects": [],
-  "skills": {
-    "programming_languages": [],
-    "monitoring_tools": [],
-    "container_tech": [],
-    "cloud_platforms": [],
-    "cicd_tools": []
-  }
-}
+```text
+Resume
+├── resume_id?: string
+├── basic_info
+│   ├── name?: string | null
+│   ├── school?: string | null
+│   ├── major?: string | null
+│   ├── degree?: string | null
+│   ├── graduation_year?: integer | null
+│   └── contact?
+│       ├── phone?: string | null
+│       └── email?: string | null
+├── internships[]
+│   ├── company?: string | null
+│   ├── role?: string | null
+│   ├── duration?: string | null
+│   ├── description?: string | null
+│   ├── tech_stack[]
+│   └── achievements[]
+├── projects[]
+│   ├── name?: string | null
+│   ├── role?: string | null
+│   ├── duration?: string | null
+│   ├── description?: string | null
+│   ├── tech_stack[]
+│   └── achievements[]
+└── skills
+    ├── programming_languages[]
+    ├── monitoring_tools[]
+    ├── container_tech[]
+    ├── cloud_platforms[]
+    ├── cicd_tools[]
+    └── ai_tools[]
 ```
 
-## Complete example
+`basic_info`, `internships`, `projects`, and `skills` may be omitted and receive
+empty defaults. Every factual scalar may be omitted or `null`. Blank optional
+text is normalized to `null`; a missing or `null` list is normalized to `[]`.
+
+Missing facts do not invalidate an otherwise well-formed document. The analyzer
+emits structured reminders. Supplied wrong types and unknown fields remain
+errors.
+
+## Valid minimal input
+
+```json
+{}
+```
+
+Its normalized `extracted.json` contains empty objects/lists and the generated
+internal `resume_id`. It still receives a complete six-dimension score at the
+minimum evidence floor.
+
+## Valid partial input
 
 ```json
 {
-  "resume_id": "candidate-example-2f8a8c01",
   "basic_info": {
-    "name": "Candidate Example",
-    "school": "Example University",
-    "major": "Computer Science",
-    "degree": "Bachelor",
-    "graduation_year": 2027,
-    "contact": {
-      "phone": "+00 000 000 000",
-      "email": "candidate@example.invalid"
-    }
+    "name": "张三",
+    "school": null,
+    "graduation_year": 2027
   },
-  "internships": [
-    {
-      "company": "Example Systems",
-      "role": "SRE Intern",
-      "duration": "2026-01 to 2026-04",
-      "description": "Implemented service dashboards and deployment checks.",
-      "tech_stack": ["Prometheus", "Grafana", "Python"],
-      "achievements": ["Reduced deployment verification time by 30% in the stated workflow."]
-    }
-  ],
   "projects": [
     {
-      "name": "Local Kubernetes Reliability Lab",
-      "role": "Project owner",
-      "duration": "2025-09 to 2025-12",
-      "description": "Built and tested monitoring and rollback paths in a local lab.",
-      "tech_stack": ["Kubernetes", "Helm", "Prometheus"],
-      "achievements": ["Documented three injected failure scenarios and recovery checks."]
+      "name": "课程平台",
+      "description": "实现并测试了一个容器化服务",
+      "tech_stack": ["Python", "Docker"]
     }
   ],
   "skills": {
     "programming_languages": ["Python"],
-    "monitoring_tools": ["Prometheus", "Grafana"],
-    "container_tech": ["Docker", "Kubernetes"],
-    "cloud_platforms": [],
-    "cicd_tools": ["GitHub Actions"]
+    "ai_tools": ["Cursor"]
   }
 }
 ```
 
-The domains use `.invalid` and fictional organizations deliberately. Do not use
-real candidate data in examples or tests.
+Do not guess the missing education, project role, duration, or achievements.
 
-## Validation behavior
+## Internal and visible identifiers
 
-Return exit code 2 for malformed JSON, wrong types, missing required fields,
-unknown fields, invalid identifiers, or v2 shapes. Report concise JSON paths,
-not the full input value. A validation failure must create no final output
-directory.
+An explicit `resume_id` must match `[A-Za-z0-9_-]{1,64}`. It remains in JSON and
+calibration data but is not shown in Markdown and is not a path.
+
+Visible output name is computed as `{safe_name}-{input_sha256[:8]}`. The safe
+name uses Unicode NFKC, preserves Chinese, removes separators/control
+characters and cross-platform reserved names, and has a length limit. Missing
+or unusable name becomes `未知姓名`.
+
+## Deliberately rejected v2 shapes
+
+The following are schema errors:
+
+- top-level `position`;
+- list-valued `skills`;
+- experience `technologies`;
+- string `graduation_year`;
+- mapping-valued `projects` or `internships`;
+- any unknown field.
+
+Do not migrate these implicitly because v3 is a breaking contract.
+
+## Data quality warnings
+
+Warnings contain exactly:
+
+```json
+{
+  "code": "missing_basic_info_school",
+  "path": "basic_info.school",
+  "message": "未提供或未可靠识别，请后续补充。"
+}
+```
+
+Missing scalars receive individual paths. Empty experience and skill groups are
+summarized at their group paths. Warnings appear in `score.json` and
+`analysis.json` for machine-readable audit. They do not appear in Markdown or
+`extracted.json`, which contains normalized facts only.
+
+## Canonical-only Python boundary
+
+Platform document capabilities are responsible for reading PDF, DOCX, or
+Markdown and producing this schema. The Python CLI does not infer resume facts
+from those formats. `extract-resume-text` creates untrusted
+`raw_extraction.json`, which is never valid canonical input and is accepted
+only through `--raw-extraction` for source/canonical auditing.

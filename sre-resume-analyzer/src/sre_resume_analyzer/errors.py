@@ -20,6 +20,10 @@ class InputValidationError(AnalyzerError):
     """The canonical resume input is invalid."""
 
 
+class SourceMappingAuditError(InputValidationError):
+    """Raw source evidence and canonical facts are materially inconsistent."""
+
+
 class PDFExtractionError(AnalyzerError):
     """PDF text extraction failed or produced unusable text."""
 

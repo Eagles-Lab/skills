@@ -43,14 +43,20 @@ def analyze_main(argv: Optional[Sequence[str]] = None) -> int:
         description="Validate and analyze one canonical v3 resume JSON document.",
     )
     parser.add_argument("--extracted", type=Path, required=True, help="canonical v3 JSON")
+    parser.add_argument(
+        "--raw-extraction",
+        type=Path,
+        help="raw_extraction.json used to audit source/canonical grounding",
+    )
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--include-contact", action="store_true")
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--seed", help="explicit deterministic interview-question seed")
     args = parser.parse_args(argv)
     try:
-        outputs = ResumeAnalyzer(args.output_dir).analyze(
+        ResumeAnalyzer(args.output_dir).analyze(
             args.extracted,
+            raw_extraction_path=args.raw_extraction,
             include_contact=args.include_contact,
             overwrite=args.overwrite,
             seed=args.seed,
@@ -70,7 +76,12 @@ def analyze_main(argv: Optional[Sequence[str]] = None) -> int:
         _print_error("internal error", type(exc).__name__)
         return int(ExitCode.INTERNAL_ERROR)
 
-    print(json.dumps({"status": "success", "outputs": outputs}, sort_keys=True))
+    print(
+        json.dumps(
+            {"status": "success", "output_dir": str(args.output_dir), "successful": 1},
+            sort_keys=True,
+        )
+    )
     return int(ExitCode.SUCCESS)
 
 
@@ -118,12 +129,18 @@ def batch_main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--parallel", type=_positive_integer, default=3)
     parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument(
+        "--raw-extraction-dir",
+        type=Path,
+        help="directory containing <canonical-stem>/raw_extraction.json audit inputs",
+    )
     args = parser.parse_args(argv)
     try:
         summary = BatchProcessor(
             args.output_dir,
             max_workers=args.parallel,
             overwrite=args.overwrite,
+            raw_extraction_dir=args.raw_extraction_dir,
         ).process_directory(args.input_dir)
     except InputValidationError as exc:
         _print_error("input error", exc)
@@ -144,7 +161,7 @@ def batch_main(argv: Optional[Sequence[str]] = None) -> int:
                 "total": summary["total"],
                 "successful": summary["successful"],
                 "failed": summary["failed"],
-                "summary": str(args.output_dir / "batch_summary.json"),
+                "output_dir": str(args.output_dir),
             },
             sort_keys=True,
         )

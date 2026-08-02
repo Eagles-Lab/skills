@@ -1,21 +1,28 @@
-"""Strict public data models for the v3 resume analyzer contract."""
+"""Public data models for the v3 campus SRE resume analyzer contract."""
 
 from __future__ import annotations
 
 from enum import StrEnum
 from typing import Annotated, Dict, List, Literal, Optional, Tuple
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    StringConstraints,
+)
 
 SCHEMA_VERSION = "3.0"
+SCORING_PROFILE = "cn-campus-sre"
 
 DimensionName = Literal[
-    "monitoring",
-    "alerting",
-    "automation",
-    "containerization",
-    "incident_handling",
-    "resume_quality",
+    "systems_network_foundation",
+    "programming_automation",
+    "troubleshooting",
+    "cloud_distributed_infrastructure",
+    "reliability_engineering",
+    "ai_engineering_aiops",
 ]
 SourceKind = Literal["skills", "internship", "project"]
 
@@ -34,44 +41,67 @@ class StrictModel(BaseModel):
 NonEmptyText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
+def _blank_to_none(value: object) -> object:
+    if isinstance(value, str):
+        stripped = value.strip()
+        return stripped or None
+    return value
+
+
+def _none_to_empty_list(value: object) -> object:
+    return [] if value is None else value
+
+
+def _none_to_empty_mapping(value: object) -> object:
+    return {} if value is None else value
+
+
+OptionalText = Annotated[
+    Optional[str],
+    BeforeValidator(_blank_to_none),
+]
+TextList = Annotated[List[NonEmptyText], BeforeValidator(_none_to_empty_list)]
+
+
 class Contact(StrictModel):
-    phone: NonEmptyText = Field(min_length=1, max_length=128)
-    email: NonEmptyText = Field(min_length=1, max_length=320)
+    phone: OptionalText = Field(default=None, max_length=128)
+    email: OptionalText = Field(default=None, max_length=320)
 
 
 class BasicInfo(StrictModel):
-    name: NonEmptyText = Field(min_length=1, max_length=256)
-    school: NonEmptyText = Field(min_length=1, max_length=512)
-    major: NonEmptyText = Field(min_length=1, max_length=256)
-    degree: NonEmptyText = Field(min_length=1, max_length=128)
-    graduation_year: int = Field(ge=1900, le=2200)
+    name: OptionalText = Field(default=None, max_length=256)
+    school: OptionalText = Field(default=None, max_length=512)
+    major: OptionalText = Field(default=None, max_length=256)
+    degree: OptionalText = Field(default=None, max_length=128)
+    graduation_year: Optional[int] = Field(default=None, ge=1900, le=2200)
     contact: Optional[Contact] = None
 
 
 class Internship(StrictModel):
-    company: NonEmptyText = Field(min_length=1, max_length=512)
-    role: NonEmptyText = Field(min_length=1, max_length=256)
-    duration: NonEmptyText = Field(min_length=1, max_length=256)
-    description: NonEmptyText = Field(min_length=1, max_length=20_000)
-    tech_stack: List[NonEmptyText]
-    achievements: List[NonEmptyText]
+    company: OptionalText = Field(default=None, max_length=512)
+    role: OptionalText = Field(default=None, max_length=256)
+    duration: OptionalText = Field(default=None, max_length=256)
+    description: OptionalText = Field(default=None, max_length=20_000)
+    tech_stack: TextList = Field(default_factory=list)
+    achievements: TextList = Field(default_factory=list)
 
 
 class Project(StrictModel):
-    name: NonEmptyText = Field(min_length=1, max_length=512)
-    role: NonEmptyText = Field(min_length=1, max_length=256)
-    duration: NonEmptyText = Field(min_length=1, max_length=256)
-    description: NonEmptyText = Field(min_length=1, max_length=20_000)
-    tech_stack: List[NonEmptyText]
-    achievements: List[NonEmptyText]
+    name: OptionalText = Field(default=None, max_length=512)
+    role: OptionalText = Field(default=None, max_length=256)
+    duration: OptionalText = Field(default=None, max_length=256)
+    description: OptionalText = Field(default=None, max_length=20_000)
+    tech_stack: TextList = Field(default_factory=list)
+    achievements: TextList = Field(default_factory=list)
 
 
 class Skills(StrictModel):
-    programming_languages: List[NonEmptyText]
-    monitoring_tools: List[NonEmptyText]
-    container_tech: List[NonEmptyText]
-    cloud_platforms: List[NonEmptyText]
-    cicd_tools: List[NonEmptyText]
+    programming_languages: TextList = Field(default_factory=list)
+    monitoring_tools: TextList = Field(default_factory=list)
+    container_tech: TextList = Field(default_factory=list)
+    cloud_platforms: TextList = Field(default_factory=list)
+    cicd_tools: TextList = Field(default_factory=list)
+    ai_tools: TextList = Field(default_factory=list)
 
 
 class Resume(StrictModel):
@@ -83,10 +113,28 @@ class Resume(StrictModel):
         max_length=64,
         pattern=r"^[A-Za-z0-9_-]+$",
     )
-    basic_info: BasicInfo
-    internships: List[Internship]
-    projects: List[Project]
-    skills: Skills
+    basic_info: Annotated[
+        BasicInfo,
+        BeforeValidator(_none_to_empty_mapping, json_schema_input_type=BasicInfo | None),
+    ] = Field(default_factory=BasicInfo)
+    internships: Annotated[
+        List[Internship],
+        BeforeValidator(_none_to_empty_list, json_schema_input_type=List[Internship] | None),
+    ] = Field(default_factory=list)
+    projects: Annotated[
+        List[Project],
+        BeforeValidator(_none_to_empty_list, json_schema_input_type=List[Project] | None),
+    ] = Field(default_factory=list)
+    skills: Annotated[
+        Skills,
+        BeforeValidator(_none_to_empty_mapping, json_schema_input_type=Skills | None),
+    ] = Field(default_factory=Skills)
+
+
+class DataQualityWarning(StrictModel):
+    code: NonEmptyText
+    path: NonEmptyText
+    message: NonEmptyText
 
 
 class EvidenceLevel(StrEnum):
@@ -111,29 +159,25 @@ class Evidence(StrictModel):
 
 class DimensionScore(StrictModel):
     score: float = Field(ge=1.0, le=10.0)
+    depth_score: float = Field(ge=1.0, le=10.0)
+    coverage_cap: float = Field(ge=1.0, le=10.0)
     weight: float = Field(gt=0.0, le=1.0)
     weighted_score: float = Field(ge=0.0, le=10.0)
     evidence: List[Evidence]
     keyword_count: int = Field(ge=0)
-    breakdown: Dict[str, float] = Field(default_factory=dict)
+    evidence_group_scores: Dict[str, float]
+    covered_evidence_groups: List[NonEmptyText]
+    applied_evidence_groups: List[NonEmptyText]
+    missing_evidence_groups: List[NonEmptyText]
+    evidence_coverage: float = Field(ge=0.0, le=1.0)
+    strongest_evidence_level: Optional[EvidenceLevel] = None
 
 
-class AIApplication(StrictModel):
-    category: NonEmptyText = Field(min_length=1)
-    keyword: NonEmptyText = Field(min_length=1)
-    source_kind: Literal["internship", "project"]
-    source_id: NonEmptyText = Field(min_length=1)
-    context: NonEmptyText = Field(min_length=1)
-    level: EvidenceLevel
-    quantified: bool = False
-
-
-class AIBonus(StrictModel):
-    score: float = Field(ge=0.0, le=1.5)
-    level: NonEmptyText = Field(min_length=1)
-    category_count: int = Field(ge=0)
-    applications: Dict[str, List[AIApplication]]
-    max_score: float = 1.5
+class ResumeQualityDiagnostic(StrictModel):
+    score: float = Field(ge=1.0, le=10.0)
+    weight: float = Field(default=0.0, ge=0.0, le=0.0)
+    breakdown: Dict[str, float]
+    findings: Dict[str, NonEmptyText]
 
 
 class GradeInfo(StrictModel):
@@ -145,9 +189,9 @@ class GradeInfo(StrictModel):
 
 class ScoreResult(StrictModel):
     schema_version: str = SCHEMA_VERSION
+    scoring_profile: Literal["cn-campus-sre"] = "cn-campus-sre"
     scoring_config_version: NonEmptyText = Field(min_length=1)
-    base_score: float = Field(ge=1.0, le=10.0)
-    ai_bonus: AIBonus
-    total_score: float = Field(ge=1.0, le=11.5)
+    total_score: float = Field(ge=1.0, le=10.0)
     dimension_scores: Dict[DimensionName, DimensionScore]
+    resume_quality: ResumeQualityDiagnostic
     grade: GradeInfo

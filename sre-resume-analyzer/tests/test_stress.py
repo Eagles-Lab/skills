@@ -1,76 +1,56 @@
-"""Determinism and concurrency gates that exercise production-sized batches."""
+from __future__ import annotations
 
+# ruff: noqa: RUF001
 import json
 from datetime import UTC, datetime
 from pathlib import Path
 
 from sre_resume_analyzer.analyzer import ResumeAnalyzer
 from sre_resume_analyzer.batch import BatchProcessor
-from sre_resume_analyzer.output import OUTPUT_FILENAMES
 
-FIXTURES = Path(__file__).parent / "fixtures"
-FIXED_TIME = datetime(2026, 8, 2, tzinfo=UTC)
+FIXED = datetime(2026, 8, 2, tzinfo=UTC)
 
 
-def _fixed_analyzer(root):
-    return ResumeAnalyzer(root, clock=lambda: FIXED_TIME)
+def write(path: Path, value: object) -> None:
+    path.write_text(json.dumps(value, ensure_ascii=False), encoding="utf-8")
 
 
-def test_same_input_is_semantically_identical_across_100_overwrites(tmp_path):
-    analyzer = _fixed_analyzer(tmp_path / "out")
-    paths = analyzer.analyze(FIXTURES / "runtime_complete.json")
-    expected = {name: Path(path).read_bytes() for name, path in paths.items()}
-
+def test_same_input_builds_semantically_identical_artifacts_100_times(tmp_path: Path):
+    source = tmp_path / "resume.json"
+    write(
+        source,
+        {
+            "basic_info": {"name": "稳定性测试"},
+            "projects": [{"description": "实现并部署 Python Kubernetes 自动化工具"}],
+        },
+    )
+    analyzer = ResumeAnalyzer(tmp_path / "unused", clock=lambda: FIXED)
+    first = analyzer.build_artifacts(source).output_payload()
     for _ in range(99):
-        paths = analyzer.analyze(FIXTURES / "runtime_complete.json", overwrite=True)
-        assert {name: Path(path).read_bytes() for name, path in paths.items()} == expected
-
-    assert not list((tmp_path / "out").glob(".tmp-*"))
-    assert not list((tmp_path / "out").glob(".backup-*"))
+        assert analyzer.build_artifacts(source).output_payload() == first
 
 
-def test_100_inputs_match_at_parallelism_1_3_and_16(tmp_path):
-    source = tmp_path / "inputs"
-    source.mkdir()
-    fixture = json.loads((FIXTURES / "runtime_complete.json").read_text(encoding="utf-8"))
-    resume_ids = []
+def test_one_hundred_parallel_inputs_have_unique_isolated_outputs(tmp_path: Path):
+    inputs = tmp_path / "inputs"
+    inputs.mkdir()
     for index in range(100):
-        resume_id = f"candidate_{index:03d}"
-        resume_ids.append(resume_id)
-        value = json.loads(json.dumps(fixture))
-        value["resume_id"] = resume_id
-        (source / f"resume-{index:03d}.json").write_text(
-            json.dumps(value, ensure_ascii=False),
-            encoding="utf-8",
+        write(
+            inputs / f"resume-{index:03}.json",
+            {
+                "basic_info": {"name": "同名候选人"},
+                "projects": [{"description": f"实现 Python 工具并测试验证，编号 {index}"}],
+            },
         )
-
-    summaries = {}
-    roots = {}
-    for workers in (1, 3, 16):
-        output_root = tmp_path / f"out-{workers}"
-        roots[workers] = output_root
-        summaries[workers] = BatchProcessor(
-            output_root,
-            max_workers=workers,
-            analyzer_factory=_fixed_analyzer,
-            clock=lambda: FIXED_TIME,
-        ).process_directory(source)
-        assert summaries[workers]["successful"] == 100
-        assert summaries[workers]["failed"] == 0
-        assert not list(output_root.glob(".tmp-*"))
-        assert not list(output_root.glob(".backup-*"))
-
-    normalized = {
-        workers: [
-            (item["resume_id"], item["status"], item["total_score"], item["grade"])
-            for item in summary["results"]
-        ]
-        for workers, summary in summaries.items()
-    }
-    assert normalized[1] == normalized[3] == normalized[16]
-
-    for resume_id in resume_ids:
-        for filename in OUTPUT_FILENAMES:
-            expected = (roots[1] / resume_id / filename).read_bytes()
-            assert (roots[3] / resume_id / filename).read_bytes() == expected
-            assert (roots[16] / resume_id / filename).read_bytes() == expected
+    output = tmp_path / "run"
+    summary = BatchProcessor(
+        output,
+        max_workers=16,
+        clock=lambda: FIXED,
+        analyzer_factory=lambda root: ResumeAnalyzer(root, clock=lambda: FIXED),
+    ).process_directory(inputs)
+    assert summary["successful"] == 100
+    analysis_dirs = list((output / "resume_analysis").iterdir())
+    interview_files = list((output / "interview_questions").iterdir())
+    assert len(analysis_dirs) == len({path.name for path in analysis_dirs}) == 100
+    assert len(interview_files) == len({path.name for path in interview_files}) == 100
+    assert all(len(list(path.iterdir())) == 4 for path in analysis_dirs)

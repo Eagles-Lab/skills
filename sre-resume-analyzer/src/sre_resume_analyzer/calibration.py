@@ -18,24 +18,25 @@ from .scoring import DIMENSION_WEIGHTS, ScoreCalculator, ScoringConfig
 CALIBRATION_FIELDS: Tuple[str, ...] = (
     "resume_id",
     "reviewer_id",
-    "monitoring",
-    "alerting",
-    "automation",
-    "containerization",
-    "incident_handling",
+    "systems_network_foundation",
+    "programming_automation",
+    "troubleshooting",
+    "cloud_distributed_infrastructure",
+    "reliability_engineering",
+    "ai_engineering_aiops",
     "resume_quality",
-    "ai_bonus",
     "overall_grade",
     "notes",
 )
 CALIBRATION_DIMENSIONS: Tuple[str, ...] = (
-    "monitoring",
-    "alerting",
-    "automation",
-    "containerization",
-    "incident_handling",
-    "resume_quality",
+    "systems_network_foundation",
+    "programming_automation",
+    "troubleshooting",
+    "cloud_distributed_infrastructure",
+    "reliability_engineering",
+    "ai_engineering_aiops",
 )
+CALIBRATION_REVIEW_DIMENSIONS: Tuple[str, ...] = (*CALIBRATION_DIMENSIONS, "resume_quality")
 GRADES: Tuple[str, ...] = ("A+", "A", "B", "C", "D", "F")
 
 
@@ -48,13 +49,13 @@ class CalibrationReview(BaseModel):
 
     resume_id: str = Field(min_length=1)
     reviewer_id: str = Field(min_length=1)
-    monitoring: float = Field(ge=1.0, le=10.0)
-    alerting: float = Field(ge=1.0, le=10.0)
-    automation: float = Field(ge=1.0, le=10.0)
-    containerization: float = Field(ge=1.0, le=10.0)
-    incident_handling: float = Field(ge=1.0, le=10.0)
+    systems_network_foundation: float = Field(ge=1.0, le=10.0)
+    programming_automation: float = Field(ge=1.0, le=10.0)
+    troubleshooting: float = Field(ge=1.0, le=10.0)
+    cloud_distributed_infrastructure: float = Field(ge=1.0, le=10.0)
+    reliability_engineering: float = Field(ge=1.0, le=10.0)
+    ai_engineering_aiops: float = Field(ge=1.0, le=10.0)
     resume_quality: float = Field(ge=1.0, le=10.0)
-    ai_bonus: float = Field(ge=0.0, le=1.5)
     overall_grade: str = Field(pattern=r"^(?:A\+|A|B|C|D|F)$")
     notes: str
 
@@ -112,15 +113,24 @@ def read_calibration_csv(path: Union[str, Path]) -> List[CalibrationReview]:
                     CalibrationReview(
                         resume_id=row["resume_id"],
                         reviewer_id=row["reviewer_id"],
-                        monitoring=_parse_float(row["monitoring"], "monitoring"),
-                        alerting=_parse_float(row["alerting"], "alerting"),
-                        automation=_parse_float(row["automation"], "automation"),
-                        containerization=_parse_float(row["containerization"], "containerization"),
-                        incident_handling=_parse_float(
-                            row["incident_handling"], "incident_handling"
+                        systems_network_foundation=_parse_float(
+                            row["systems_network_foundation"], "systems_network_foundation"
+                        ),
+                        programming_automation=_parse_float(
+                            row["programming_automation"], "programming_automation"
+                        ),
+                        troubleshooting=_parse_float(row["troubleshooting"], "troubleshooting"),
+                        cloud_distributed_infrastructure=_parse_float(
+                            row["cloud_distributed_infrastructure"],
+                            "cloud_distributed_infrastructure",
+                        ),
+                        reliability_engineering=_parse_float(
+                            row["reliability_engineering"], "reliability_engineering"
+                        ),
+                        ai_engineering_aiops=_parse_float(
+                            row["ai_engineering_aiops"], "ai_engineering_aiops"
                         ),
                         resume_quality=_parse_float(row["resume_quality"], "resume_quality"),
-                        ai_bonus=_parse_float(row["ai_bonus"], "ai_bonus"),
                         overall_grade=row["overall_grade"],
                         notes=row["notes"],
                     )
@@ -235,7 +245,7 @@ class CalibrationEvaluator:
                 raise CalibrationError(f"missing tool score for resume {resume_id}")
 
         reviewer_kappa: Dict[str, float] = {}
-        for dimension in (*CALIBRATION_DIMENSIONS, "ai_bonus"):
+        for dimension in CALIBRATION_REVIEW_DIMENSIONS:
             first = [
                 _review_for(grouped[item], reviewer_ids[0]).model_dump()[dimension]
                 for item in ordered_ids
@@ -262,7 +272,7 @@ class CalibrationEvaluator:
         human_grades: List[str] = []
         tool_grades: List[str] = []
         dimension_errors: Dict[str, List[float]] = {
-            dimension: [] for dimension in CALIBRATION_DIMENSIONS
+            dimension: [] for dimension in CALIBRATION_REVIEW_DIMENSIONS
         }
         sample_errors: Dict[str, float] = {}
 
@@ -272,12 +282,8 @@ class CalibrationEvaluator:
                 dimension: statistics.fmean(float(getattr(review, dimension)) for review in pair)
                 for dimension in CALIBRATION_DIMENSIONS
             }
-            human_ai = statistics.fmean(review.ai_bonus for review in pair)
-            human_total = (
-                sum(
-                    human_dimensions[key] * DIMENSION_WEIGHTS[key] for key in CALIBRATION_DIMENSIONS
-                )
-                + human_ai
+            human_total = sum(
+                human_dimensions[key] * DIMENSION_WEIGHTS[key] for key in CALIBRATION_DIMENSIONS
             )
             tool_score = tool_scores[resume_id]
             tool_total = _tool_total(tool_score)
@@ -293,6 +299,10 @@ class CalibrationEvaluator:
                 dimension_errors[dimension].append(
                     abs(human_dimensions[dimension] - _tool_dimension_score(tool_score, dimension))
                 )
+            human_quality = statistics.fmean(review.resume_quality for review in pair)
+            dimension_errors["resume_quality"].append(
+                abs(human_quality - _tool_dimension_score(tool_score, "resume_quality"))
+            )
 
         mean_kappa = statistics.fmean(reviewer_kappa.values())
         spearman = spearman_correlation(human_totals, tool_totals)
@@ -369,7 +379,7 @@ def render_calibration_markdown(report: CalibrationReport) -> str:
         "## Per-dimension error",
         "",
     ]
-    for dimension in CALIBRATION_DIMENSIONS:
+    for dimension in CALIBRATION_REVIEW_DIMENSIONS:
         lines.append(f"- {dimension}: {report.per_dimension_mae[dimension]:.4f}")
     if report.group_median_absolute_error:
         lines.extend(["", "## Group error", ""])
@@ -450,6 +460,15 @@ def _tool_grade(score: Union[ScoreResult, Mapping[str, Any]]) -> str:
 
 
 def _tool_dimension_score(score: Union[ScoreResult, Mapping[str, Any]], dimension: str) -> float:
+    if dimension == "resume_quality":
+        if isinstance(score, ScoreResult):
+            return float(score.resume_quality.score)
+        quality = score["resume_quality"]
+        if isinstance(quality, Mapping):
+            return float(quality["score"])
+        if hasattr(quality, "score"):
+            return float(quality.score)
+        raise CalibrationError("tool resume_quality has no score")
     if isinstance(score, ScoreResult):
         for name, dimension_score in score.dimension_scores.items():
             if name == dimension:
