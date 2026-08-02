@@ -8,15 +8,29 @@
 
 | 项目 | 内容 |
 | --- | --- |
+{% if basic_info.name %}
 | 姓名 | {{ basic_info.name }} |
+{% endif %}
+{% if basic_info.school %}
 | 学校 | {{ basic_info.school }} |
+{% endif %}
+{% if basic_info.major %}
 | 专业 | {{ basic_info.major }} |
+{% endif %}
+{% if basic_info.degree %}
 | 学历 | {{ basic_info.degree }} |
+{% endif %}
+{% if basic_info.graduation_year %}
 | 毕业年份 | {{ basic_info.graduation_year }} |
+{% endif %}
 | 生成时间 | {{ generated_at }} |
 {% if contact %}
+{% if contact.email %}
 | 邮箱 | {{ contact.email }} |
+{% endif %}
+{% if contact.phone %}
 | 电话 | {{ contact.phone }} |
+{% endif %}
 {% endif %}
 
 ## 综合结果

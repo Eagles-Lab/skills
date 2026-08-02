@@ -23,6 +23,9 @@ specific tool name in the core Skill.
 
 ## Common finish
 
-Validate the produced JSON against [schema.md](schema.md), run
-`analyze-resume`, validate the five distributed artifacts, and delete temporary
-canonical staging. Python never claims to parse DOCX or Markdown directly.
+Persist complete extracted text, source SHA-256, and `content_trust: untrusted`
+in a private `raw_extraction.json` following
+[source-mapping-audit.md](source-mapping-audit.md). Validate canonical v3, run
+`analyze-resume` with `--raw-extraction`, validate the five distributed
+artifacts, and delete raw/canonical staging. Python never claims to parse DOCX
+or Markdown directly.

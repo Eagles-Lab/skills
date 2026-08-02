@@ -45,6 +45,84 @@ def test_partial_batch_atomically_publishes_successes_and_redacted_failure(tmp_p
     assert len(list((output / "interview_questions").iterdir())) == 1
 
 
+def test_source_mapping_audit_partially_fails_incomplete_canonical(tmp_path: Path):
+    inputs = tmp_path / "inputs"
+    inputs.mkdir()
+    raw_inputs = tmp_path / "raw"
+    raw_inputs.mkdir()
+    write(
+        inputs / "good.json",
+        {
+            "basic_info": {"name": "候选甲"},
+            "projects": [{"name": "自动化平台", "description": "使用 Python 实现工具"}],
+        },
+    )
+    write(inputs / "bad.json", {"basic_info": {"name": "候选乙"}, "projects": []})
+    for stem, text in (
+        ("good", "候选甲 项目经历 自动化平台 使用 Python 实现工具"),
+        ("bad", "候选乙 项目经历 监控平台"),
+    ):
+        directory = raw_inputs / stem
+        directory.mkdir()
+        write(
+            directory / "raw_extraction.json",
+            {
+                "content_trust": "untrusted",
+                "source_sha256": ("a" if stem == "good" else "b") * 64,
+                "full_text": text,
+            },
+        )
+    output = tmp_path / "run"
+
+    summary = BatchProcessor(
+        output,
+        raw_extraction_dir=raw_inputs,
+        clock=lambda: FIXED,
+        analyzer_factory=lambda root: ResumeAnalyzer(root, clock=lambda: FIXED),
+    ).process_directory(inputs)
+
+    assert summary["successful"] == 1
+    assert summary["failed"] == 1
+    failure = next(item for item in summary["results"] if item["status"] == "failed")
+    assert failure["error_category"] == "SourceMappingAuditError"
+    score_path = next((output / "resume_analysis").glob("*/score.json"))
+    score = json.loads(score_path.read_text())
+    assert score["source_mapping_audit"]["passed"] is True
+
+
+def test_raw_extraction_lookup_cannot_escape_or_follow_candidate_symlink(tmp_path: Path):
+    inputs = tmp_path / "inputs"
+    inputs.mkdir()
+    write(inputs / "...json", {"basic_info": {"name": "候选甲"}})
+    raw_inputs = tmp_path / "raw"
+    raw_inputs.mkdir()
+
+    summary = BatchProcessor(
+        tmp_path / "escape-run",
+        raw_extraction_dir=raw_inputs,
+        clock=lambda: FIXED,
+    ).process_directory(inputs)
+
+    assert summary["failed"] == 1
+    assert summary["results"][0]["error_category"] == "BatchPreflightError"
+
+    safe_inputs = tmp_path / "safe-inputs"
+    safe_inputs.mkdir()
+    write(safe_inputs / "candidate.json", {"basic_info": {"name": "候选乙"}})
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (raw_inputs / "candidate").symlink_to(outside, target_is_directory=True)
+
+    summary = BatchProcessor(
+        tmp_path / "symlink-run",
+        raw_extraction_dir=raw_inputs,
+        clock=lambda: FIXED,
+    ).process_directory(safe_inputs)
+
+    assert summary["failed"] == 1
+    assert summary["results"][0]["error_category"] == "BatchPreflightError"
+
+
 def test_duplicate_content_fails_before_workers_and_writes_nothing(tmp_path: Path):
     inputs = tmp_path / "inputs"
     inputs.mkdir()

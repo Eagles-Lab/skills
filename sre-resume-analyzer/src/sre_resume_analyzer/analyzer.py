@@ -23,6 +23,7 @@ from .output import (
 from .rendering import DIMENSION_LABELS, RenderingError, ReportRenderer
 from .scoring import SCORING_CONFIG_VERSION, ScoreCalculator
 from .security import SECURITY_WARNING, contains_instruction_like_content
+from .source_audit import audit_source_mapping
 from .version import ANALYZER_VERSION, STATUS
 
 Clock = Callable[[], datetime]
@@ -131,10 +132,16 @@ class ResumeAnalyzer:
         self,
         extracted_path: Path,
         *,
+        raw_extraction_path: Optional[Path] = None,
         include_contact: bool = False,
         seed: Optional[str] = None,
     ) -> AnalysisArtifacts:
         resume, input_sha256, resume_id, output_name = self.inspect_input(extracted_path)
+        source_audit = (
+            audit_source_mapping(raw_extraction_path, resume)
+            if raw_extraction_path is not None
+            else None
+        )
         generated_at = self.clock().astimezone(UTC).replace(microsecond=0).isoformat()
         generated_at = generated_at.replace("+00:00", "Z")
         data_warnings = collect_data_quality_warnings(resume)
@@ -164,6 +171,8 @@ class ResumeAnalyzer:
                     ),
                 }
             )
+            if source_audit is not None:
+                score_data["source_mapping_audit"] = source_audit.public_metadata()
             analysis = self._build_analysis(
                 score_data,
                 resume_id,
@@ -210,12 +219,14 @@ class ResumeAnalyzer:
         self,
         extracted_path: Path,
         *,
+        raw_extraction_path: Optional[Path] = None,
         include_contact: bool = False,
         overwrite: bool = False,
         seed: Optional[str] = None,
     ) -> Dict[str, str]:
         artifacts = self.build_artifacts(
             extracted_path,
+            raw_extraction_path=raw_extraction_path,
             include_contact=include_contact,
             seed=seed,
         )

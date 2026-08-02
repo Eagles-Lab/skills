@@ -43,6 +43,11 @@ def analyze_main(argv: Optional[Sequence[str]] = None) -> int:
         description="Validate and analyze one canonical v3 resume JSON document.",
     )
     parser.add_argument("--extracted", type=Path, required=True, help="canonical v3 JSON")
+    parser.add_argument(
+        "--raw-extraction",
+        type=Path,
+        help="raw_extraction.json used to audit source/canonical grounding",
+    )
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--include-contact", action="store_true")
     parser.add_argument("--overwrite", action="store_true")
@@ -51,6 +56,7 @@ def analyze_main(argv: Optional[Sequence[str]] = None) -> int:
     try:
         ResumeAnalyzer(args.output_dir).analyze(
             args.extracted,
+            raw_extraction_path=args.raw_extraction,
             include_contact=args.include_contact,
             overwrite=args.overwrite,
             seed=args.seed,
@@ -123,12 +129,18 @@ def batch_main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--parallel", type=_positive_integer, default=3)
     parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument(
+        "--raw-extraction-dir",
+        type=Path,
+        help="directory containing <canonical-stem>/raw_extraction.json audit inputs",
+    )
     args = parser.parse_args(argv)
     try:
         summary = BatchProcessor(
             args.output_dir,
             max_workers=args.parallel,
             overwrite=args.overwrite,
+            raw_extraction_dir=args.raw_extraction_dir,
         ).process_directory(args.input_dir)
     except InputValidationError as exc:
         _print_error("input error", exc)

@@ -348,24 +348,24 @@ class ReportRenderer:
     @staticmethod
     def _safe_basic_info(value: Mapping[str, Any]) -> Dict[str, Any]:
         return {
-            "name": _display(value.get("name")),
-            "school": _display(value.get("school")),
-            "major": _display(value.get("major")),
-            "degree": _display(value.get("degree")),
-            "graduation_year": value.get("graduation_year") or MISSING_DISPLAY,
+            "name": sanitize_report_text(value["name"]) if value.get("name") else None,
+            "school": sanitize_report_text(value["school"]) if value.get("school") else None,
+            "major": sanitize_report_text(value["major"]) if value.get("major") else None,
+            "degree": sanitize_report_text(value["degree"]) if value.get("degree") else None,
+            "graduation_year": value.get("graduation_year"),
         }
 
     @staticmethod
-    def _safe_contact(value: Any) -> Optional[Dict[str, str]]:
+    def _safe_contact(value: Any) -> Optional[Dict[str, Optional[str]]]:
         if not isinstance(value, Mapping):
             return None
         return {
             "email": sanitize_included_contact_text(value.get("email"))
             if value.get("email")
-            else MISSING_DISPLAY,
+            else None,
             "phone": sanitize_included_contact_text(value.get("phone"))
             if value.get("phone")
-            else MISSING_DISPLAY,
+            else None,
         }
 
     @staticmethod
@@ -387,7 +387,7 @@ class ReportRenderer:
             return ["补充至少一个能够说明个人职责、实施过程和验证结果的项目。"]
         suggestions = []
         for project in projects:
-            name = _display(project.get("name"))
+            name = sanitize_report_text(project["name"]) if project.get("name") else "该项目"
             if not project.get("achievements"):
                 suggestions.append(f"{name}：补充可验证的结果或运行指标。")
             if not project.get("role"):
@@ -413,29 +413,39 @@ class ReportRenderer:
         rng = random.Random(int.from_bytes(canonical_seed[:8], "big"))
         candidates: List[Dict[str, Any]] = []
         for internship in resume.get("internships", []):
-            company = _display(internship.get("company"))
+            company = (
+                sanitize_report_text(internship["company"])
+                if internship.get("company")
+                else "该实习经历"
+            )
             candidates.append(
                 {
                     "category": "实习经历",
                     "question": f"请说明你在{company}承担的具体责任、排障过程和验证结果。",
-                    "context": _display(internship.get("description")),
+                    "context": sanitize_report_text(internship["description"])
+                    if internship.get("description")
+                    else "",
                     "expected_keywords": sanitize_report_list(internship.get("tech_stack", [])),
                 }
             )
         for project in resume.get("projects", []):
-            name = _display(project.get("name"))
+            name = sanitize_report_text(project["name"]) if project.get("name") else "该项目"
             candidates.extend(
                 [
                     {
                         "category": "项目经历",
                         "question": f"请说明{name}中你的角色、关键决策和责任边界。",
-                        "context": _display(project.get("description")),
+                        "context": sanitize_report_text(project["description"])
+                        if project.get("description")
+                        else "",
                         "expected_keywords": sanitize_report_list(project.get("tech_stack", [])),
                     },
                     {
                         "category": "项目经历",
                         "question": f"如果重新实现{name}，你会改变什么？如何验证改进有效？",
-                        "context": _display(project.get("description")),
+                        "context": sanitize_report_text(project["description"])
+                        if project.get("description")
+                        else "",
                         "expected_keywords": sanitize_report_list(project.get("achievements", [])),
                     },
                 ]

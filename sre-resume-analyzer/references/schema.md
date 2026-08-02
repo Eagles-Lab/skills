@@ -128,4 +128,5 @@ summarized at their group paths. Warnings appear in `score.json` and
 Platform document capabilities are responsible for reading PDF, DOCX, or
 Markdown and producing this schema. The Python CLI does not infer resume facts
 from those formats. `extract-resume-text` creates untrusted
-`raw_extraction.json`, which is never valid canonical input.
+`raw_extraction.json`, which is never valid canonical input and is accepted
+only through `--raw-extraction` for source/canonical auditing.

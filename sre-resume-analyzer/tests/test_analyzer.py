@@ -41,7 +41,7 @@ def test_empty_input_completes_with_warnings_and_safe_fallback(tmp_path: Path):
     suggestions = Path(outputs["suggestions"]).read_text()
     assert "待补充信息" not in suggestions
     assert "basic_info.contact.phone" not in suggestions
-    assert MISSING_DATA_MESSAGE in suggestions
+    assert MISSING_DATA_MESSAGE not in suggestions
 
 
 def test_complete_input_uses_chinese_name_and_separate_interview_directory(tmp_path: Path):

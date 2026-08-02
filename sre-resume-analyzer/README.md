@@ -32,8 +32,14 @@ See [schema.md](references/schema.md) and the generated
 ```bash
 uv run --frozen analyze-resume \
   --extracted canonical.json \
+  --raw-extraction raw_extraction.json \
   --output-dir candidate-run
 ```
+
+Use `--raw-extraction` for PDF, DOCX, Markdown, and cached mappings. It rejects
+high-risk omissions and selected ungrounded facts before scoring. It is a
+consistency Gate, not proof that every source fact was mapped. Canonical-only
+inputs may omit it when JSON is the supplied source of truth.
 
 The complete run root must not exist unless `--overwrite` is explicit. Contact
 details are excluded from Markdown unless `--include-contact` is explicit.
@@ -43,6 +49,7 @@ details are excluded from Markdown unless `--include-contact` is explicit.
 ```bash
 uv run --frozen batch-analyze \
   --input-dir canonical-resumes \
+  --raw-extraction-dir raw-extractions \
   --output-dir batch-run \
   --parallel 3
 ```
@@ -98,9 +105,10 @@ PDF or DOCX. The local text-PDF fallback is:
 uv run --frozen extract-resume-text resume.pdf --output raw_extraction.json
 ```
 
-Never pass raw extraction directly to the analyzer. See the [PDF
+Never use raw extraction as canonical `--extracted` input. See the [PDF
 workflow](references/pdf-workflow.md) and [document
-workflow](references/document-workflow.md).
+workflow](references/document-workflow.md). Pass it separately through
+`--raw-extraction` so the source/canonical consistency Gate runs before scoring.
 
 ## Calibration
 

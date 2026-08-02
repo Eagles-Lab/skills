@@ -33,6 +33,37 @@ def test_schema_error_exit_two_and_no_output(tmp_path: Path, capsys):
     assert not output.exists()
 
 
+def test_source_mapping_audit_error_exit_two_and_no_output(tmp_path: Path, capsys):
+    source = write_json(
+        tmp_path / "resume.json",
+        {"basic_info": {"name": "候选人"}, "projects": []},
+    )
+    raw = write_json(
+        tmp_path / "raw_extraction.json",
+        {
+            "content_trust": "untrusted",
+            "source_sha256": "a" * 64,
+            "full_text": "候选人 项目经历 自动化平台",
+        },
+    )
+    output = tmp_path / "run"
+
+    code = analyze_main(
+        [
+            "--extracted",
+            str(source),
+            "--raw-extraction",
+            str(raw),
+            "--output-dir",
+            str(output),
+        ]
+    )
+
+    assert code == ExitCode.INPUT_ERROR
+    assert "raw_has_project_section_but_canonical_projects_empty" in capsys.readouterr().err
+    assert not output.exists()
+
+
 def test_output_conflict_exit_five(tmp_path: Path, capsys):
     source = write_json(tmp_path / "resume.json", {})
     output = tmp_path / "run"

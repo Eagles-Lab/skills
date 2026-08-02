@@ -15,7 +15,10 @@ Then run from the skill directory:
 
 ```bash
 uv sync --frozen
-uv run --frozen analyze-resume --extracted canonical.json --output-dir run-root
+uv run --frozen analyze-resume \
+  --extracted canonical.json \
+  --raw-extraction raw_extraction.json \
+  --output-dir run-root
 ```
 
 The forward test must begin in a clean context with only this Skill and a

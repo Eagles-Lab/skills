@@ -94,6 +94,8 @@ The public score artifact includes:
 - `scoring_config_version: "cn-campus-sre-1.1.0"`;
 - internal `resume_id` and visible `output_name`;
 - input SHA-256 and UTC generation time;
+- for raw-document runs, a passed `source_mapping_audit` with its audit version,
+  raw source SHA-256, and privacy-safe warning codes;
 - six `dimension_scores` with evidence, depth score, evidence-group scores,
   applied coverage, missing groups, and coverage cap;
 - weight-zero `resume_quality` with breakdown and findings;

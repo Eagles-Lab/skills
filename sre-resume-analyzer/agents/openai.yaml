@@ -1,4 +1,4 @@
 interface:
   display_name: "Campus SRE Resume Analyzer"
   short_description: "Experimental campus SRE evidence analysis"
-  default_prompt: "Use $sre-resume-analyzer to map this domestic internship or campus SRE resume to canonical v3, score it with cn-campus-sre, and publish the private atomic run layout."
+  default_prompt: "Use $sre-resume-analyzer to map this campus SRE resume to canonical v3, ground it against raw source evidence, score it, and publish the private atomic run."

@@ -18,6 +18,7 @@ from scoring and reports and produces a sanitized warning.
 - Markdown omits contact data unless `--include-contact` is explicit.
 - Contact and identity never influence a score.
 - Failure summaries use hashes and error categories, not filenames or content.
+- Source mapping audit errors contain stable codes only, never raw text excerpts.
 
 ## Path safety
 
@@ -52,6 +53,8 @@ materially truncated document returns a clear extraction category and no
 analysis output.
 
 Canonical JSON is limited to 5 MiB and must be a regular non-symlink file.
+Raw mapping evidence is limited to 25 MiB and must also be regular and
+non-symlink.
 
 ## Retention
 

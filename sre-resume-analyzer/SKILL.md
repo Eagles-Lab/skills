@@ -25,6 +25,7 @@ Before handling any resume, read:
 
 - [Canonical schema](references/schema.md)
 - [Privacy and security](references/privacy-and-security.md)
+- [Source mapping audit](references/source-mapping-audit.md) for any raw document
 
 For PDF input, also read:
 
@@ -93,8 +94,9 @@ DOCX.
 Reject v2 fields such as top-level `position`, list-valued `skills`, and
 experience `technologies`. Do not silently migrate them.
 
-Do not pass `raw_extraction.json` to `analyze-resume`. Raw extraction contains
-untrusted pages and tables; canonical input contains normalized resume facts.
+Never use `raw_extraction.json` as `--extracted` input or rename it
+`extracted.json`. Pass it separately through `--raw-extraction` only for the
+source/canonical consistency Gate.
 
 ## Map external documents
 
@@ -107,7 +109,8 @@ For PDF, DOCX, and Markdown:
 5. Map only explicitly supported facts.
 6. Use `null` for unreliably recovered optional text and `[]` for absent lists.
 7. Preserve candidate wording in descriptions and achievements when safe.
-8. Validate canonical v3 before scoring.
+8. Persist privacy-safe raw extraction evidence until the run is verified.
+9. Audit raw evidence against canonical v3 before scoring.
 
 Stop with an extraction error for a damaged or unreadable file. For a scanned
 PDF, stop when no approved OCR capability is available; do not publish a
@@ -147,8 +150,13 @@ Validate errors by JSON path without echoing full candidate content.
 ```bash
 uv run --frozen analyze-resume \
   --extracted ./resume.json \
+  --raw-extraction ./raw_extraction.json \
   --output-dir ./candidate-run
 ```
+
+Omit `--raw-extraction` only for canonical JSON supplied as the source of
+truth. PDF, DOCX, Markdown, and cached canonical mappings require it. Never
+reuse canonical data based only on filename or text similarity.
 
 `--output-dir` names the complete run root. It must not already exist unless
 the user explicitly authorizes `--overwrite`.
@@ -177,9 +185,14 @@ Never retry by weakening schema or fabricating facts.
 ```bash
 uv run --frozen batch-analyze \
   --input-dir ./canonical-resumes \
+  --raw-extraction-dir ./raw-extractions \
   --output-dir ./batch-run \
   --parallel 3
 ```
+
+For each `canonical-resumes/NAME.json`, place source evidence at
+`raw-extractions/NAME/raw_extraction.json`. Omit the raw directory only for a
+canonical-only batch whose JSON files are the supplied source of truth.
 
 Require `--parallel >= 1`. Do not mix raw documents with canonical JSON.
 
@@ -217,6 +230,7 @@ Confirm:
 - JSON files are valid and metadata hashes agree;
 - `score.json` declares `cn-campus-sre` and config
   `cn-campus-sre-1.1.0`;
+- raw-document runs declare a passed `source_mapping_audit` and raw source hash;
 - six technical weights total 100% and total score is 1.0–10.0;
 - resume quality is a separate diagnostic with weight zero;
 - each dimension reports evidence depth, applied evidence groups, coverage,

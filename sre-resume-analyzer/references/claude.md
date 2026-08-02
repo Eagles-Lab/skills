@@ -11,7 +11,10 @@ Run the shared Python core from the skill directory:
 
 ```bash
 uv sync --frozen
-uv run --frozen analyze-resume --extracted canonical.json --output-dir run-root
+uv run --frozen analyze-resume \
+  --extracted canonical.json \
+  --raw-extraction raw_extraction.json \
+  --output-dir run-root
 ```
 
 The Claude forward test must use a clean context, the updated Skill, and a

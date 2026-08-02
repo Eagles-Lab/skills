@@ -64,10 +64,22 @@ def test_report_has_new_dimensions_quality_explanations_and_no_legacy_contract()
     assert "无- 尚未形成实际应用证据" not in text
 
 
-def test_missing_facts_use_explicit_reminder_not_fabricated_values():
-    text = render(Resume.model_validate({})).suggestions
-    assert "未提供或未可靠识别，请后续补充。" in text
+def test_missing_facts_are_omitted_from_markdown_not_fabricated():
+    reports = render(Resume.model_validate({}))
+    text = reports.suggestions
+    assert "未提供或未可靠识别，请后续补充。" not in text
     assert "示例大学" not in text
+    assert "| 学校 |" not in text
+    assert "| 学历 |" not in text
+    assert "未提供或未可靠识别，请后续补充。" not in reports.interview_questions
+
+
+def test_unnamed_project_uses_neutral_reference_not_missing_data_message():
+    reports = render(Resume.model_validate({"projects": [{"description": "完成系统部署"}]}))
+
+    assert "该项目：补充可验证的结果或运行指标。" in reports.suggestions
+    assert "未提供或未可靠识别，请后续补充。" not in reports.suggestions
+    assert "未提供或未可靠识别，请后续补充。" not in reports.interview_questions
 
 
 def test_report_explains_applied_evidence_group_coverage():
