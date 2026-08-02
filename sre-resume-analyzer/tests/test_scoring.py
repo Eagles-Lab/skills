@@ -24,6 +24,14 @@ DIMENSION_TERM = {
     "reliability_engineering": "Prometheus",
 }
 
+DIMENSION_COVERAGE_TERMS = {
+    "systems_network_foundation": ("Linux", "TCP", "MySQL"),
+    "programming_automation": ("Python", "Bash", "pytest"),
+    "troubleshooting": ("日志分析", "tcpdump", "根因分析"),
+    "cloud_distributed_infrastructure": ("Kubernetes", "AWS", "Kafka"),
+    "reliability_engineering": ("Prometheus", "告警规则", "SLO"),
+}
+
 
 def project(description: str) -> dict[str, object]:
     return {"description": description}
@@ -53,14 +61,6 @@ def test_weights_profile_and_empty_floor_contract():
         (["使用 {term} 完成课程实验"], 4.0),
         (["实现并部署 {term} 工具"], 6.0),
         (["负责设计并部署 {term}，完成故障排查和测试验证"], 8.0),
-        (["在生产环境部署 {term} 并服务真实用户"], 9.0),
-        (
-            [
-                "负责设计并部署 {term}，完成故障排查和测试验证",
-                "实现并部署 {term} 独立工具",
-            ],
-            10.0,
-        ),
     ],
 )
 def test_general_dimension_evidence_boundaries(dimension, term, descriptions, expected):
@@ -73,6 +73,34 @@ def test_general_dimension_evidence_boundaries(dimension, term, descriptions, ex
     assert score(value).dimension_scores[dimension].score == expected
 
 
+@pytest.mark.parametrize("dimension,terms", DIMENSION_COVERAGE_TERMS.items())
+def test_general_high_scores_require_multiple_applied_evidence_groups(dimension, terms):
+    first, second, third = terms
+    narrow = score(
+        {"projects": [project(f"在生产环境部署 {first} 并服务真实用户")]}
+    ).dimension_scores[dimension]
+    broad_result = score(
+        {"projects": [project(f"在生产环境部署 {first} 和 {second} 并服务真实用户")]}
+    ).dimension_scores[dimension]
+    multi_source = score(
+        {
+            "projects": [
+                project(f"负责设计并部署 {first} 和 {second}，完成故障排查和测试验证"),
+                project(f"实现并部署 {third} 独立工具"),
+            ]
+        }
+    ).dimension_scores[dimension]
+
+    assert narrow.depth_score == 9.0
+    assert narrow.coverage_cap == 8.0
+    assert narrow.score == 8.0
+    assert len(narrow.applied_evidence_groups) == 1
+    assert broad_result.depth_score == broad_result.coverage_cap == broad_result.score == 9.0
+    assert len(broad_result.applied_evidence_groups) == 2
+    assert multi_source.depth_score == multi_source.coverage_cap == multi_source.score == 10.0
+    assert len(multi_source.applied_evidence_groups) >= 3
+
+
 @pytest.mark.parametrize(
     "value,expected",
     [
@@ -83,7 +111,7 @@ def test_general_dimension_evidence_boundaries(dimension, term, descriptions, ex
             {"projects": [project("实现 RAG 自动诊断工作流，建立评测集并加入权限与人工确认")]},
             8.0,
         ),
-        ({"projects": [project("在生产环境部署 RAG 自动诊断并服务真实用户")]}, 9.0),
+        ({"projects": [project("在生产环境部署 RAG Agent 自动诊断并服务真实用户")]}, 9.0),
         (
             {
                 "projects": [
@@ -177,6 +205,7 @@ def test_grade_boundaries():
         lambda value: value["dimension_weights"].pop("systems_network_foundation"),
         lambda value: value["dimension_weights"].update({"systems_network_foundation": 0.3}),
         lambda value: value["matching"]["dimension_keywords"].pop("troubleshooting"),
+        lambda value: value["evidence_groups"].pop("troubleshooting"),
         lambda value: value["grade_thresholds"]["A+"]["range"].__setitem__(1, 11.5),
     ],
 )
@@ -231,6 +260,17 @@ def test_all_config_contract_error_branches():
     mutations.append(value)
     value = copy.deepcopy(DEFAULT_SCORING_CONFIG)
     value["grade_thresholds"]["A"]["range"] = [9.4, 8.5]
+    mutations.append(value)
+    value = copy.deepcopy(DEFAULT_SCORING_CONFIG)
+    value["evidence_groups"]["systems_network_foundation"]["operating_systems_resources"] = []
+    mutations.append(value)
+    value = copy.deepcopy(DEFAULT_SCORING_CONFIG)
+    value["evidence_groups"]["systems_network_foundation"]["networking_protocols"].append("linux")
+    mutations.append(value)
+    value = copy.deepcopy(DEFAULT_SCORING_CONFIG)
+    value["evidence_groups"]["systems_network_foundation"]["operating_systems_resources"].remove(
+        "linux"
+    )
     mutations.append(value)
     for invalid in mutations:
         with pytest.raises(ValidationError):

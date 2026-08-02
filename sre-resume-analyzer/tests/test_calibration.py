@@ -132,5 +132,5 @@ def test_scoring_config_diff_is_stable():
     changed["version"] = "candidate"
     candidate = ScoringConfig.model_validate(changed)
     assert scoring_config_diff(baseline, candidate) == {
-        "version": {"before": "cn-campus-sre-1.0.0", "after": "candidate"}
+        "version": {"before": "cn-campus-sre-1.1.0", "after": "candidate"}
     }

@@ -40,6 +40,12 @@ Keyword repetition never raises a level. A single complete student project can
 reach 8; it does not need two projects. Score 10 always needs independent
 sources.
 
+Depth alone is not the final dimension score. Count distinct capability groups
+with project/internship evidence above mention level. Zero applied groups cap a
+dimension at 2, one caps it at 8, two cap it at 9, and three or more allow 10.
+The final dimension score is the lower of evidence depth and coverage cap.
+Skills-list mentions and synonymous tools do not increase applied coverage.
+
 ## Six dimensions
 
 `systems_network_foundation` covers operating systems, Linux, networking,
@@ -64,6 +70,17 @@ on-call, and chaos exercises.
 
 `ai_engineering_aiops` covers verified AI-assisted engineering, RAG, agents,
 alert summaries, anomaly detection, and automated diagnosis.
+
+Capability groups are:
+
+| Dimension | Capability groups |
+|---|---|
+| Systems/network | operating systems and resources; network protocols; storage/IO; databases; concurrency/algorithms |
+| Programming/automation | programming languages; scripting/automation; testing/engineering; CI/CD/version control; infrastructure as code |
+| Troubleshooting | logs/observability; resource diagnosis; network diagnosis; performance analysis; experiment validation; root cause/recovery |
+| Cloud/distributed | containers/orchestration; cloud platforms; distributed architecture; middleware/messaging; data/storage services |
+| Reliability | monitoring/observability; alerting; service levels; capacity/performance; availability/recovery; operations/change; resilience validation |
+| AI/AIOps | assisted engineering; LLM/RAG; agent workflows; evaluation; AIOps/diagnosis |
 
 ## AI constraints
 

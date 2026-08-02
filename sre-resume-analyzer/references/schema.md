@@ -119,8 +119,8 @@ Warnings contain exactly:
 ```
 
 Missing scalars receive individual paths. Empty experience and skill groups are
-summarized at their group paths to avoid report noise. Warnings appear in
-`score.json`, `analysis.json`, and the suggestions report. They do not appear in
+summarized at their group paths. Warnings appear in `score.json` and
+`analysis.json` for machine-readable audit. They do not appear in Markdown or
 `extracted.json`, which contains normalized facts only.
 
 ## Canonical-only Python boundary

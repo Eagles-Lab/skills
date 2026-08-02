@@ -28,14 +28,28 @@
 
 ## 六个技术维度
 
-| 维度 | 证据分 | 权重 | 证据等级 |
-| --- | ---: | ---: | --- |
+| 维度 | 证据分 | 权重 | 实际应用类别覆盖 | 证据等级 |
+| --- | ---: | ---: | ---: | --- |
 {% for dimension in dimensions %}
-| {{ dimension.label }} | {{ dimension.score }}/10 | {{ dimension.weight_percent }}% | {{ dimension.evidence_level }} |
+| {{ dimension.label }} | {{ dimension.score }}/10 | {{ dimension.weight_percent }}% | {{ dimension.applied_group_count }}/{{ dimension.total_group_count }} | {{ dimension.evidence_level }} |
 {% endfor %}
 
 {% for dimension in dimensions %}
 ### {{ dimension.label }}（{{ dimension.score }}/10）
+
+- 原始证据深度：{{ dimension.depth_score }}/10
+- 证据类别覆盖上限：{{ dimension.coverage_cap }}/10
+- 实际应用类别覆盖：{{ dimension.applied_group_count }}/{{ dimension.total_group_count }}（{{ dimension.evidence_coverage_percent }}%）
+{% if dimension.applied_groups %}
+- 已形成实际应用证据：{{ dimension.applied_groups | join('、') }}
+{% else %}
+- 已形成实际应用证据：无
+{% endif %}
+{% if dimension.non_applied_groups %}
+- 尚未形成实际应用证据：{{ dimension.non_applied_groups | join('、') }}
+{% else %}
+- 尚未形成实际应用证据：无
+{% endif %}
 
 具体证据：
 {% if dimension.evidence %}
@@ -58,16 +72,6 @@
 {% for item in quality_items %}
 | {{ item.label }} | {{ item.score }}/2 | {{ item.finding }} |
 {% endfor %}
-
-## 待补充信息
-
-{% if data_quality_warnings %}
-{% for warning in data_quality_warnings %}
-- `{{ warning.path }}`：{{ warning.message }}
-{% endfor %}
-{% else %}
-- 未发现结构化字段缺失提醒。
-{% endif %}
 
 ## 优势
 

@@ -29,6 +29,54 @@ DIMENSION_LABELS = {
     "ai_engineering_aiops": "AI 辅助工程与 AIOps 实践",
 }
 
+EVIDENCE_GROUP_LABELS = {
+    "systems_network_foundation": {
+        "operating_systems_resources": "操作系统与资源",
+        "networking_protocols": "网络协议",
+        "storage_io": "文件系统与 IO",
+        "databases": "数据库基础",
+        "concurrency_algorithms": "并发、数据结构与算法",
+    },
+    "programming_automation": {
+        "programming_languages": "编程语言",
+        "scripting_automation": "脚本与自动化",
+        "testing_engineering": "测试与工程质量",
+        "cicd_version_control": "CI/CD 与版本控制",
+        "infrastructure_as_code": "基础设施即代码",
+    },
+    "troubleshooting": {
+        "logs_observability": "日志与可观测证据",
+        "resource_diagnosis": "资源排查",
+        "network_diagnosis": "网络诊断",
+        "performance_analysis": "性能定位",
+        "experiment_validation": "实验与验证",
+        "root_cause_recovery": "根因、恢复与复盘",
+    },
+    "cloud_distributed_infrastructure": {
+        "containers_orchestration": "容器与编排",
+        "cloud_platforms": "云平台",
+        "distributed_architecture": "分布式架构",
+        "middleware_messaging": "中间件与消息系统",
+        "data_storage_services": "数据库与存储服务",
+    },
+    "reliability_engineering": {
+        "monitoring_observability": "监控与可观测性",
+        "alerting": "告警设计",
+        "service_levels": "SLI/SLO 与错误预算",
+        "capacity_performance": "容量与性能",
+        "availability_recovery": "高可用与恢复",
+        "operations_change": "值班、Runbook 与发布回滚",
+        "resilience_validation": "故障演练与韧性验证",
+    },
+    "ai_engineering_aiops": {
+        "assisted_engineering": "AI 辅助工程",
+        "llm_rag": "LLM 与 RAG",
+        "agent_workflows": "Agent 与工作流",
+        "evaluation": "评测",
+        "aiops_diagnosis": "AIOps 与自动诊断",
+    },
+}
+
 IMPROVEMENT_SUGGESTIONS = {
     "systems_network_foundation": (
         "结合课程实验或项目说明 Linux、网络、并发、存储等基础原理如何用于实际判断。"
@@ -118,6 +166,21 @@ def _evidence_text(item: Mapping[str, Any]) -> str:
         if item.get(key):
             return sanitize_report_text(item[key])
     return "已识别到结构化证据。"
+
+
+def _unique_evidence_texts(values: Any) -> List[str]:
+    if not isinstance(values, Sequence) or isinstance(values, (str, bytes)):
+        return []
+    results: List[str] = []
+    seen = set()
+    for item in values:
+        if not isinstance(item, Mapping):
+            continue
+        text = _evidence_text(item)
+        if text not in seen:
+            seen.add(text)
+            results.append(text)
+    return results
 
 
 def _evidence_level(score: float) -> str:
@@ -218,17 +281,31 @@ class ReportRenderer:
         for name in DIMENSION_LABELS:
             info = dict(raw_dimensions.get(name, {}))
             numeric_score = float(info.get("score", 1.0))
+            group_labels = EVIDENCE_GROUP_LABELS[name]
+            applied_groups = [
+                group_labels.get(group, group) for group in info.get("applied_evidence_groups", [])
+            ]
+            non_applied_groups = [
+                label
+                for group, label in group_labels.items()
+                if group not in info.get("applied_evidence_groups", [])
+            ]
             dimensions.append(
                 {
                     "label": DIMENSION_LABELS[name],
                     "score": numeric_score,
                     "weight_percent": round(float(info.get("weight", 0)) * 100),
                     "evidence_level": _evidence_level(numeric_score),
-                    "evidence": [
-                        _evidence_text(item)
-                        for item in info.get("evidence", [])
-                        if isinstance(item, Mapping)
-                    ],
+                    "depth_score": float(info.get("depth_score", numeric_score)),
+                    "coverage_cap": float(info.get("coverage_cap", 10.0)),
+                    "applied_group_count": len(applied_groups),
+                    "total_group_count": len(group_labels),
+                    "evidence_coverage_percent": round(
+                        float(info.get("evidence_coverage", 0.0)) * 100
+                    ),
+                    "applied_groups": applied_groups,
+                    "non_applied_groups": non_applied_groups,
+                    "evidence": _unique_evidence_texts(info.get("evidence", [])),
                     "suggestion": IMPROVEMENT_SUGGESTIONS[name],
                 }
             )
@@ -264,14 +341,6 @@ class ReportRenderer:
             "strengths": self._safe_analysis_items(analysis.get("strengths", [])),
             "weaknesses": self._safe_analysis_items(analysis.get("weaknesses", [])),
             "project_suggestions": self._project_suggestions(resume),
-            "data_quality_warnings": [
-                {
-                    "path": sanitize_report_text(item.get("path", "")),
-                    "message": sanitize_report_text(item.get("message", MISSING_DISPLAY)),
-                }
-                for item in analysis.get("data_quality_warnings", [])
-                if isinstance(item, Mapping)
-            ],
             "status_notice": "本报告衡量国内实习/校招 SRE 简历的证据覆盖度，不能单独用于招聘决策。",
             "security_warnings": list(analysis.get("security_warnings", [])),
         }

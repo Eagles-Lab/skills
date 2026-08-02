@@ -133,6 +133,8 @@ skills group.
 Missing facts do not fail analysis. They produce `data_quality_warnings` with
 `code`, `path`, and the standard reminder. Wrong supplied types, unknown
 fields, v2 fields, malformed JSON, and unsafe identifiers still fail closed.
+Keep these warnings in JSON for audit; do not render a Markdown missing-data
+section.
 
 An explicit `resume_id` must match `[A-Za-z0-9_-]{1,64}`. It is an internal
 stable identifier only and must not be shown in Markdown or used as a visible
@@ -214,10 +216,13 @@ Confirm:
 - every successful candidate has four analysis files and one question file;
 - JSON files are valid and metadata hashes agree;
 - `score.json` declares `cn-campus-sre` and config
-  `cn-campus-sre-1.0.0`;
+  `cn-campus-sre-1.1.0`;
 - six technical weights total 100% and total score is 1.0–10.0;
 - resume quality is a separate diagnostic with weight zero;
-- warnings appear in score, analysis, and suggestions, not extracted facts;
+- each dimension reports evidence depth, applied evidence groups, coverage,
+  and its coverage-based score cap;
+- data-quality warnings appear in score and analysis, not extracted facts or
+  Markdown;
 - contact details are absent by default;
 - reports contain no legacy dimensions, AI bonus, or per-dimension letter;
 - every interview file contains exactly ten deterministic questions.
@@ -260,6 +265,6 @@ any gate fails, keep `experimental` and state the open gate.
 ## Return to the user
 
 Report the private run root, success/failure counts, overall evidence grade,
-strongest and weakest dimensions, warning summary, contact inclusion policy,
-and validation status. Do not paste names, contacts, full resume text, or
-private calibration data into chat unless explicitly necessary.
+strongest and weakest dimensions, contact inclusion policy, and validation
+status. Do not paste names, contacts, full resume text, or private calibration
+data into chat unless explicitly necessary.

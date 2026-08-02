@@ -159,10 +159,17 @@ class Evidence(StrictModel):
 
 class DimensionScore(StrictModel):
     score: float = Field(ge=1.0, le=10.0)
+    depth_score: float = Field(ge=1.0, le=10.0)
+    coverage_cap: float = Field(ge=1.0, le=10.0)
     weight: float = Field(gt=0.0, le=1.0)
     weighted_score: float = Field(ge=0.0, le=10.0)
     evidence: List[Evidence]
     keyword_count: int = Field(ge=0)
+    evidence_group_scores: Dict[str, float]
+    covered_evidence_groups: List[NonEmptyText]
+    applied_evidence_groups: List[NonEmptyText]
+    missing_evidence_groups: List[NonEmptyText]
+    evidence_coverage: float = Field(ge=0.0, le=1.0)
     strongest_evidence_level: Optional[EvidenceLevel] = None
 
 

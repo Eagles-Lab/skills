@@ -57,12 +57,40 @@ def test_report_has_new_dimensions_quality_explanations_and_no_legacy_contract()
     assert "基础分" not in text
     assert "/11.5" not in text
     assert "简历 ID" not in text
+    assert "实际应用类别覆盖" in text
+    assert "原始证据深度" in text
+    assert "待补充信息" not in text
+    assert "basic_info.school" not in text
+    assert "无- 尚未形成实际应用证据" not in text
 
 
 def test_missing_facts_use_explicit_reminder_not_fabricated_values():
     text = render(Resume.model_validate({})).suggestions
     assert "未提供或未可靠识别，请后续补充。" in text
     assert "示例大学" not in text
+
+
+def test_report_explains_applied_evidence_group_coverage():
+    resume = Resume.model_validate(
+        {"projects": [{"description": ("在生产环境使用 Kubernetes 和 AWS 部署服务并服务真实用户")}]}
+    )
+    text = render(resume).suggestions
+    assert "实际应用类别覆盖：2/5（40%）" in text
+    assert "容器与编排、云平台" in text
+    assert "证据类别覆盖上限：9.0/10" in text
+
+
+def test_repeated_evidence_context_is_rendered_once():
+    resume = Resume.model_validate(
+        {
+            "projects": [
+                {"description": ("负责使用 Prometheus 和 Grafana 部署监控平台并设计告警规则")}
+            ]
+        }
+    )
+    text = render(resume).suggestions
+    repeated = "负责使用 Prometheus 和 Grafana 部署监控平台并设计告警规则"
+    assert text.count(repeated) == 1
 
 
 def test_question_generation_is_seeded_stable_and_exactly_ten():

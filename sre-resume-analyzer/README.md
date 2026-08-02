@@ -83,6 +83,12 @@ Technical total is 1.0–10.0. Resume quality is a separate weight-zero diagnosi
 with five explained items. There is no AI bonus or legacy monitoring/alerting
 dimension contract. See [scoring-rubric.md](references/scoring-rubric.md).
 
+Each dimension separately records evidence depth and applied capability-group
+coverage. Skills-list mentions never count as applied coverage. Coverage caps
+the final dimension score at 2 for zero applied groups, 8 for one, 9 for two,
+and 10 for three or more. Structured missing-data warnings remain in JSON but
+are temporarily omitted from Markdown reports.
+
 ## External document mapping
 
 Use the platform's installed reader. Python does not infer resume fields from

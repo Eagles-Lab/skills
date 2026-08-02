@@ -39,7 +39,8 @@ def test_empty_input_completes_with_warnings_and_safe_fallback(tmp_path: Path):
     assert extracted["basic_info"]["school"] is None
     assert "data_quality_warnings" not in extracted
     suggestions = Path(outputs["suggestions"]).read_text()
-    assert "待补充信息" in suggestions
+    assert "待补充信息" not in suggestions
+    assert "basic_info.contact.phone" not in suggestions
     assert MISSING_DATA_MESSAGE in suggestions
 
 

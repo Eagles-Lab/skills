@@ -33,7 +33,7 @@ from .models import (
 )
 from .security import is_instruction_like
 
-SCORING_CONFIG_VERSION = "cn-campus-sre-1.0.0"
+SCORING_CONFIG_VERSION = "cn-campus-sre-1.1.0"
 
 DIMENSION_WEIGHTS: Dict[str, float] = {
     "systems_network_foundation": 0.22,
@@ -42,6 +42,80 @@ DIMENSION_WEIGHTS: Dict[str, float] = {
     "cloud_distributed_infrastructure": 0.14,
     "reliability_engineering": 0.18,
     "ai_engineering_aiops": 0.10,
+}
+
+# Concepts are matched in matching.py, then collapsed into capability groups so
+# breadth is measured without rewarding lists of synonymous tools.
+DIMENSION_EVIDENCE_GROUPS: Dict[str, Dict[str, Tuple[str, ...]]] = {
+    "systems_network_foundation": {
+        "operating_systems_resources": ("linux", "system resources"),
+        "networking_protocols": ("networking",),
+        "storage_io": ("storage",),
+        "databases": ("database",),
+        "concurrency_algorithms": ("concurrency", "data structures"),
+    },
+    "programming_automation": {
+        "programming_languages": ("python", "go", "java", "c/c++"),
+        "scripting_automation": ("shell", "automation"),
+        "testing_engineering": ("testing", "engineering"),
+        "cicd_version_control": ("ci/cd", "version control"),
+        "infrastructure_as_code": ("iac",),
+    },
+    "troubleshooting": {
+        "logs_observability": ("log analysis",),
+        "resource_diagnosis": ("resource analysis",),
+        "network_diagnosis": ("packet analysis",),
+        "performance_analysis": ("profiling",),
+        "experiment_validation": ("hypothesis validation",),
+        "root_cause_recovery": (
+            "troubleshooting",
+            "debugging",
+            "root cause analysis",
+            "incident response",
+            "postmortem",
+        ),
+    },
+    "cloud_distributed_infrastructure": {
+        "containers_orchestration": ("docker", "kubernetes", "container", "orchestration"),
+        "cloud_platforms": ("cloud",),
+        "distributed_architecture": (
+            "distributed systems",
+            "microservices",
+            "service discovery",
+        ),
+        "middleware_messaging": ("message queue", "middleware"),
+        "data_storage_services": ("database service", "storage service"),
+    },
+    "reliability_engineering": {
+        "monitoring_observability": (
+            "prometheus",
+            "grafana",
+            "zabbix",
+            "datadog",
+            "opentelemetry",
+            "distributed tracing",
+            "observability",
+            "metrics",
+            "logging",
+        ),
+        "alerting": ("alertmanager", "alert rules", "alert deduplication"),
+        "service_levels": ("sli/slo",),
+        "capacity_performance": ("capacity",),
+        "availability_recovery": (
+            "disaster recovery",
+            "failover",
+            "high availability",
+        ),
+        "operations_change": ("on-call", "runbook", "release rollback"),
+        "resilience_validation": ("chaos engineering",),
+    },
+    "ai_engineering_aiops": {
+        "assisted_engineering": ("ai coding",),
+        "llm_rag": ("llm", "rag"),
+        "agent_workflows": ("agent", "ai workflow"),
+        "evaluation": ("evaluation",),
+        "aiops_diagnosis": ("anomaly detection", "aiops", "automated diagnosis"),
+    },
 }
 
 EVIDENCE_SCORES: Dict[str, float] = {
@@ -77,6 +151,10 @@ DEFAULT_SCORING_CONFIG: Dict[str, object] = {
     "evidence_scores": copy.deepcopy(EVIDENCE_SCORES),
     "grade_thresholds": copy.deepcopy(GRADE_THRESHOLDS),
     "matching": copy.deepcopy(DEFAULT_MATCHING_CONFIG),
+    "evidence_groups": {
+        dimension: {group: list(concepts) for group, concepts in groups.items()}
+        for dimension, groups in DIMENSION_EVIDENCE_GROUPS.items()
+    },
 }
 
 TECHNICAL_DIMENSIONS: Tuple[DimensionName, ...] = (
@@ -157,6 +235,7 @@ class ScoringConfig(BaseModel):
     evidence_scores: Dict[str, float]
     grade_thresholds: Dict[str, GradeThreshold]
     matching: MatchingSettings
+    evidence_groups: Dict[str, Dict[str, List[str]]]
 
     @model_validator(mode="after")
     def validate_contract(self) -> ScoringConfig:
@@ -180,6 +259,18 @@ class ScoringConfig(BaseModel):
             raise ValueError("cn-campus-sre grade boundaries are fixed")
         if set(self.matching.dimension_keywords) != set(TECHNICAL_DIMENSIONS):
             raise ValueError("matching must define the six campus SRE dimensions")
+        if set(self.evidence_groups) != set(TECHNICAL_DIMENSIONS):
+            raise ValueError("evidence_groups must define the six campus SRE dimensions")
+        for dimension in TECHNICAL_DIMENSIONS:
+            configured_concepts = set(self.matching.dimension_keywords[dimension])
+            groups = self.evidence_groups[dimension]
+            if not groups or any(not concepts for concepts in groups.values()):
+                raise ValueError(f"evidence_groups for {dimension} must be non-empty")
+            assigned = [concept for concepts in groups.values() for concept in concepts]
+            if len(assigned) != len(set(assigned)) or set(assigned) != configured_concepts:
+                raise ValueError(
+                    f"evidence_groups for {dimension} must assign every concept exactly once"
+                )
         return self
 
     @classmethod
@@ -251,11 +342,16 @@ class ScoreCalculator:
         evidence: Sequence[Evidence],
         resume: Resume,
     ) -> DimensionScore:
-        score = (
+        depth_score = (
             self._score_ai_dimension(evidence, resume)
             if dimension == "ai_engineering_aiops"
             else self._score_general_dimension(evidence, resume)
         )
+        group_scores, covered_groups, applied_groups, missing_groups = (
+            self._evidence_group_coverage(dimension, evidence)
+        )
+        coverage_cap = _coverage_cap(len(applied_groups))
+        score = min(depth_score, coverage_cap)
         strongest = max(
             (item.level for item in evidence),
             key=lambda level: self.config.evidence_scores[level.value],
@@ -264,12 +360,45 @@ class ScoreCalculator:
         weight = self.config.dimension_weights[dimension]
         return DimensionScore(
             score=score,
+            depth_score=depth_score,
+            coverage_cap=coverage_cap,
             weight=weight,
             weighted_score=score * weight,
             evidence=list(evidence),
             keyword_count=len({item.keyword for item in evidence}),
+            evidence_group_scores=group_scores,
+            covered_evidence_groups=covered_groups,
+            applied_evidence_groups=applied_groups,
+            missing_evidence_groups=missing_groups,
+            evidence_coverage=len(applied_groups) / len(group_scores),
             strongest_evidence_level=strongest,
         )
+
+    def _evidence_group_coverage(
+        self,
+        dimension: DimensionName,
+        evidence: Sequence[Evidence],
+    ) -> Tuple[Dict[str, float], List[str], List[str], List[str]]:
+        group_scores: Dict[str, float] = {}
+        covered: List[str] = []
+        applied: List[str] = []
+        missing: List[str] = []
+        for group, concepts in self.config.evidence_groups[dimension].items():
+            items = [item for item in evidence if item.keyword in concepts]
+            if not items:
+                group_scores[group] = 0.0
+                missing.append(group)
+                continue
+            covered.append(group)
+            group_scores[group] = max(
+                self.config.evidence_scores[item.level.value] for item in items
+            )
+            if any(
+                item.source_kind != "skills" and item.level != EvidenceLevel.mention
+                for item in items
+            ):
+                applied.append(group)
+        return group_scores, covered, applied, missing
 
     def _score_general_dimension(self, evidence: Sequence[Evidence], resume: Resume) -> float:
         if not evidence:
@@ -485,6 +614,18 @@ def _has_real_world_result(items: Sequence[Evidence], text: str) -> bool:
         _REAL_WORLD.search(text)
         or any(item.quantified and item.level == EvidenceLevel.outcome for item in items)
     )
+
+
+def _coverage_cap(applied_group_count: int) -> float:
+    """Cap high evidence depth when it is narrow in technical capability breadth."""
+
+    if applied_group_count <= 0:
+        return 2.0
+    if applied_group_count == 1:
+        return 8.0
+    if applied_group_count == 2:
+        return 9.0
+    return 10.0
 
 
 def _quality_finding(score: float, positive: str, improvement: str) -> str:

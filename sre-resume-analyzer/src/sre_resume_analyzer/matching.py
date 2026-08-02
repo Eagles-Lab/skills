@@ -10,12 +10,23 @@ from typing import Dict, Iterator, List, Mapping, Optional, Sequence, Tuple
 from .models import DimensionName, Evidence, EvidenceLevel, Resume, SourceKind
 from .security import is_instruction_like
 
-MATCHING_CONFIG_VERSION = "cn-campus-sre-1.0.0"
+MATCHING_CONFIG_VERSION = "cn-campus-sre-1.1.0"
 
 # Variants that represent the same concept are grouped under one canonical key.
 DEFAULT_DIMENSION_KEYWORDS: Dict[str, Dict[str, Tuple[str, ...]]] = {
     "systems_network_foundation": {
         "linux": ("linux", "unix", "操作系统", "进程", "线程"),
+        "system resources": (
+            "cpu",
+            "memory",
+            "page cache",
+            "load average",
+            "context switch",
+            "内存",
+            "系统负载",
+            "上下文切换",
+            "oom",
+        ),
         "networking": (
             "tcp/ip",
             "tcp",
@@ -29,7 +40,16 @@ DEFAULT_DIMENSION_KEYWORDS: Dict[str, Dict[str, Tuple[str, ...]]] = {
         "data structures": ("data structures", "数据结构", "算法"),
         "database": ("database", "mysql", "postgresql", "redis", "数据库"),
         "concurrency": ("concurrency", "concurrent", "并发", "锁", "协程"),
-        "storage": ("filesystem", "file system", "存储系统", "文件系统", "io"),
+        "storage": (
+            "filesystem",
+            "file system",
+            "存储系统",
+            "文件系统",
+            "磁盘 io",
+            "磁盘 i/o",
+            "i/o",
+            "io",
+        ),
     },
     "programming_automation": {
         "python": ("python",),
@@ -40,6 +60,7 @@ DEFAULT_DIMENSION_KEYWORDS: Dict[str, Dict[str, Tuple[str, ...]]] = {
         "testing": ("unit test", "integration test", "pytest", "单元测试", "集成测试"),
         "automation": ("automation", "自动化", "自动化脚本"),
         "ci/cd": ("ci/cd", "cicd", "持续集成", "持续交付", "github actions"),
+        "version control": ("git", "github", "gitlab", "版本控制", "代码版本"),
         "iac": ("terraform", "ansible", "infrastructure as code", "基础设施即代码"),
         "engineering": ("api", "sdk", "cli", "代码审查", "code review"),
     },
@@ -57,6 +78,26 @@ DEFAULT_DIMENSION_KEYWORDS: Dict[str, Dict[str, Tuple[str, ...]]] = {
         "profiling": ("profiling", "profile", "性能分析", "性能定位"),
         "log analysis": ("log analysis", "日志分析", "日志排查"),
         "packet analysis": ("tcpdump", "wireshark", "抓包"),
+        "resource analysis": (
+            "cpu 使用率",
+            "cpu utilization",
+            "内存占用",
+            "memory usage",
+            "磁盘 io",
+            "disk io",
+            "系统负载",
+            "load average",
+            "oom",
+        ),
+        "hypothesis validation": (
+            "验证假设",
+            "对照实验",
+            "实验验证",
+            "回归验证",
+            "复测",
+            "复现",
+            "controlled experiment",
+        ),
         "incident response": ("incident response", "故障响应", "应急响应"),
         "postmortem": ("postmortem", "复盘"),
     },
@@ -69,6 +110,23 @@ DEFAULT_DIMENSION_KEYWORDS: Dict[str, Dict[str, Tuple[str, ...]]] = {
         "microservices": ("microservices", "微服务"),
         "service discovery": ("service discovery", "服务发现", "etcd", "consul"),
         "message queue": ("kafka", "rabbitmq", "消息队列"),
+        "middleware": ("middleware", "中间件", "nginx", "envoy"),
+        "database service": (
+            "mysql",
+            "postgresql",
+            "redis",
+            "mongodb",
+            "database",
+            "数据库",
+        ),
+        "storage service": (
+            "s3",
+            "对象存储",
+            "块存储",
+            "ceph",
+            "minio",
+            "存储服务",
+        ),
         "orchestration": ("helm", "kustomize", "service mesh", "服务网格", "istio"),
     },
     "reliability_engineering": {
@@ -79,7 +137,7 @@ DEFAULT_DIMENSION_KEYWORDS: Dict[str, Dict[str, Tuple[str, ...]]] = {
         "opentelemetry": ("opentelemetry", "otel"),
         "distributed tracing": ("distributed tracing", "分布式追踪", "分布式链路追踪"),
         "observability": ("observability", "可观测性"),
-        "sli/slo": ("sli", "slo", "服务等级目标"),
+        "sli/slo": ("sli", "slo", "error budget", "错误预算", "服务等级目标"),
         "metrics": ("metrics", "指标监控", "监控指标"),
         "logging": ("log aggregation", "日志聚合", "loki", "elk", "efk"),
         "alertmanager": ("alertmanager",),
@@ -87,8 +145,14 @@ DEFAULT_DIMENSION_KEYWORDS: Dict[str, Dict[str, Tuple[str, ...]]] = {
         "on-call": ("on-call", "on call", "值班"),
         "runbook": ("runbook", "playbook", "处置手册"),
         "alert deduplication": ("alert deduplication", "告警收敛", "告警降噪"),
-        "slo": ("sli", "slo", "error budget", "错误预算", "服务等级目标"),
         "capacity": ("capacity planning", "容量规划", "压测", "load testing"),
+        "release rollback": (
+            "release rollback",
+            "deployment rollback",
+            "发布回滚",
+            "灰度发布",
+            "回滚方案",
+        ),
         "disaster recovery": ("disaster recovery", "灾难恢复", "容灾"),
         "failover": ("failover", "故障切换"),
         "high availability": ("high availability", "高可用"),
@@ -107,7 +171,15 @@ DEFAULT_DIMENSION_KEYWORDS: Dict[str, Dict[str, Tuple[str, ...]]] = {
         "rag": ("rag", "retrieval augmented generation", "检索增强生成"),
         "agent": ("ai agent", "agent orchestration", "智能体", "多智能体"),
         "ai workflow": ("langgraph", "告警分析", "ai 工作流", "ai workflow"),
-        "evaluation": ("llm evaluation", "model evaluation", "模型评测", "评测集"),
+        "evaluation": (
+            "llm evaluation",
+            "model evaluation",
+            "模型评测",
+            "评测集",
+            "评测样本",
+            "故障样本",
+            "规则基线",
+        ),
         "anomaly detection": ("anomaly detection", "异常检测"),
         "aiops": ("aiops", "智能告警", "智能监控"),
         "automated diagnosis": ("automated diagnosis", "自动诊断", "告警摘要"),
@@ -183,12 +255,13 @@ _QUANTIFIED_PATTERN = re.compile(
     re.IGNORECASE,
 )
 _ACTION_PATTERN = re.compile(
-    r"使用|运用|采用|利用|借助|通过|构造|比较|处理|维护|操作|参与|用(?=\s*[A-Za-z])|"
+    r"使用|运用|采用|利用|借助|通过|构造|比较|处理|维护|操作|参与|"
+    r"分析|排查|定位|验证|测试|压测|复测|复现|恢复|回滚|用(?=\s*[A-Za-z])|"
     r"\b(?:use[ds]?|using|operate[ds]?|maintain(?:ed|s)?|participat(?:e|ed|ing)|handle[ds]?)\b",
     re.IGNORECASE,
 )
 _IMPLEMENTATION_PATTERN = re.compile(
-    r"实现|搭建|部署|配置|开发|构建|编写|创建|迁移|集成|自动化|"
+    r"实现|搭建|部署|配置|开发|构建|编写|创建|迁移|集成|自动化|定义|设置|制定|"
     r"\b(?:implement(?:ed|s|ing)?|build|built|deploy(?:ed|s|ing)?|configur(?:e|ed|ing)|"
     r"develop(?:ed|s|ing)?|creat(?:e|ed|ing)|migrat(?:e|ed|ing)|integrat(?:e|ed|ing)|automate[ds]?)\b",
     re.IGNORECASE,
