@@ -133,7 +133,7 @@ def test_symlink_target_and_duplicate_names_fail_closed(tmp_path: Path):
 
 def test_private_directory_and_standalone_helpers(tmp_path: Path):
     files = output.write_private_directory_bundle(
-        tmp_path / "calibration", {"report.md": "ok"}, overwrite=False
+        tmp_path / "bundle", {"report.md": "ok"}, overwrite=False
     )
     assert files["report.md"].read_text() == "ok\n"
     path = output.write_json_atomically(tmp_path / "one.json", {"b": 2, "a": 1}, overwrite=False)

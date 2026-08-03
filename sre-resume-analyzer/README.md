@@ -110,20 +110,15 @@ workflow](references/pdf-workflow.md) and [document
 workflow](references/document-workflow.md). Pass it separately through
 `--raw-extraction` so the source/canonical consistency Gate runs before scoring.
 
-## Calibration
+## Status boundary
 
-Private calibration requires 40–60 de-identified domestic campus resumes and
-two independent SRE reviewers:
+Human-review calibration is intentionally outside the current product scope.
+There is no calibration command, reviewer workflow, dataset requirement, or
+calibration Gate before analysis and publication.
 
-```bash
-uv run --frozen calibrate-scoring \
-  --resumes calibration-private/resumes \
-  --reviews calibration-private/reviews.csv \
-  --output-dir calibration-private/report
-```
-
-Until calibration thresholds and isolated Codex/Claude forward tests pass, the
-package remains `experimental`.
+The package remains `experimental` because its deterministic score describes
+resume evidence coverage; it is not a validated predictor of job performance
+and must not be used for candidate ranking or hiring decisions.
 
 ## Validation
 
@@ -143,7 +138,7 @@ validation, and Markdown links.
 | Code | Meaning |
 |---:|---|
 | 0 | Success |
-| 1 | Internal error or failed calibration gate |
+| 1 | Internal error |
 | 2 | Input/schema error |
 | 3 | Partial batch failure |
 | 4 | PDF extraction failure |

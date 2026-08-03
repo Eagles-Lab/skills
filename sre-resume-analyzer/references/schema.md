@@ -86,7 +86,7 @@ Do not guess the missing education, project role, duration, or achievements.
 ## Internal and visible identifiers
 
 An explicit `resume_id` must match `[A-Za-z0-9_-]{1,64}`. It remains in JSON and
-calibration data but is not shown in Markdown and is not a path.
+audit data but is not shown in Markdown and is not a path.
 
 Visible output name is computed as `{safe_name}-{input_sha256[:8]}`. The safe
 name uses Unicode NFKC, preserves Chinese, removes separators/control

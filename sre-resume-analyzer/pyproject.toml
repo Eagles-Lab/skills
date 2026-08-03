@@ -30,7 +30,6 @@ dev = [
 [project.scripts]
 analyze-resume = "sre_resume_analyzer.cli:analyze_main"
 batch-analyze = "sre_resume_analyzer.cli:batch_main"
-calibrate-scoring = "sre_resume_analyzer.cli:calibrate_main"
 extract-resume-text = "sre_resume_analyzer.cli:extract_main"
 
 [tool.setuptools]

@@ -38,7 +38,7 @@ For DOCX or Markdown input, also read:
 - [Document workflow](references/document-workflow.md)
 - the adapter for the current platform
 
-For scoring explanations or calibration, also read:
+For scoring explanations, also read:
 
 - [Evidence model](references/evidence-model.md)
 - [Scoring rubric](references/scoring-rubric.md)
@@ -259,26 +259,21 @@ findings directly; never substitute a technical-evidence empty-state message.
 Do not claim percentiles, production readiness, fairness, benchmark speed, or
 accuracy without a documented passed gate.
 
-## Calibration and release gate
+## Status boundary
 
-Keep private calibration data outside Git. Require 40–60 de-identified domestic
-internship/campus resumes and exactly two independent SRE reviewers who cannot
-see each other's or the tool's scores.
+Human-review calibration is outside the current product scope. Do not request a
+calibration dataset, recruit independent reviewers, or run a calibration Gate.
+Calibration is not required before analysis or publication.
 
-```bash
-uv run --frozen calibrate-scoring \
-  --resumes ./calibration-private/resumes \
-  --reviews ./calibration-private/reviews.csv \
-  --output-dir ./calibration-private/report
-```
-
-Require every threshold in the rubric. Also require isolated Codex and Claude
-forward tests from raw documents to the final run layout. If data is missing or
-any gate fails, keep `experimental` and state the open gate.
+Keep the analyzer `experimental` because the score is a deterministic resume-
+evidence heuristic, not a validated predictor of job performance. Verify raw-
+document flows, source mapping, deterministic scoring, security controls, and
+the final run layout on the current platform. Never use the result for candidate
+ranking or hiring decisions.
 
 ## Return to the user
 
 Report the private run root, success/failure counts, overall evidence grade,
 strongest and weakest dimensions, contact inclusion policy, and validation
-status. Do not paste names, contacts, full resume text, or private calibration
-data into chat unless explicitly necessary.
+status. Do not paste names, contacts, or full resume text into chat unless
+explicitly necessary.
