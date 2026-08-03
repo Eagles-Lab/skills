@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 from typing import Optional, Sequence
 
-from .analyzer import ResumeAnalyzer, load_resume
+from .analyzer import ResumeAnalyzer
 from .batch import BatchProcessor
 from .errors import (
     AnalyzerError,
@@ -16,12 +16,6 @@ from .errors import (
     InputValidationError,
     OutputSafetyError,
     PDFExtractionError,
-)
-from .output import (
-    derive_resume_id,
-    sha256_file,
-    validate_resume_id,
-    write_private_directory_bundle,
 )
 from .pdf import PDFLimits, write_raw_extraction
 
@@ -169,107 +163,3 @@ def batch_main(argv: Optional[Sequence[str]] = None) -> int:
     if summary["failed"]:
         return int(ExitCode.PARTIAL_BATCH_FAILURE)
     return int(ExitCode.SUCCESS)
-
-
-def calibrate_main(argv: Optional[Sequence[str]] = None) -> int:
-    """Evaluate private human reviews against already-generated score files."""
-
-    parser = argparse.ArgumentParser(
-        prog="calibrate-scoring",
-        description="Compare two-reviewer calibration CSV data with analyzer score files.",
-    )
-    parser.add_argument("--reviews", type=Path, required=True)
-    parser.add_argument("--resumes", type=Path, required=True)
-    parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--baseline-config", type=Path)
-    parser.add_argument("--candidate-config", type=Path)
-    parser.add_argument("--overwrite", action="store_true")
-    args = parser.parse_args(argv)
-    try:
-        from .calibration import (
-            CalibrationError,
-            evaluate_calibration_csv,
-            render_calibration_markdown,
-            scoring_config_diff,
-        )
-        from .scoring import ScoreCalculator, ScoringConfig
-
-        if not args.resumes.exists() or not args.resumes.is_dir():
-            raise InputValidationError("canonical resumes directory does not exist")
-        scores = {}
-        metadata = {}
-        baseline_config = ScoringConfig.from_source(args.baseline_config)
-        candidate_config = ScoringConfig.from_source(args.candidate_config)
-        calculator = ScoreCalculator(candidate_config)
-        for path in sorted(args.resumes.glob("*.json")):
-            resume = load_resume(path)
-            digest = sha256_file(path)
-            resume_id = (
-                validate_resume_id(resume.resume_id)
-                if resume.resume_id is not None
-                else derive_resume_id(resume.basic_info.name, digest)
-            )
-            if resume_id in scores:
-                raise InputValidationError(f"duplicate canonical resume_id: {resume_id}")
-            scores[resume_id] = calculator.calculate(resume)
-            resume_text = json.dumps(resume.model_dump(mode="json"), ensure_ascii=False)
-            if resume.internships and resume.projects:
-                resume_type = "internship_and_project"
-            elif resume.internships:
-                resume_type = "internship_only"
-            elif resume.projects:
-                resume_type = "project_only"
-            else:
-                resume_type = "skills_only"
-            metadata[resume_id] = {
-                "language": (
-                    "zh"
-                    if any("\u4e00" <= character <= "\u9fff" for character in resume_text)
-                    else "en"
-                ),
-                "resume_type": resume_type,
-            }
-        if not scores:
-            raise InputValidationError("resumes directory contains no canonical JSON files")
-
-        report = evaluate_calibration_csv(
-            args.reviews,
-            scores,
-            metadata=metadata,
-            config_diff=scoring_config_diff(baseline_config, candidate_config),
-        )
-        write_private_directory_bundle(
-            args.output_dir,
-            {
-                "calibration_report.json": json.dumps(
-                    report.model_dump(mode="json"),
-                    ensure_ascii=False,
-                    indent=2,
-                    sort_keys=True,
-                ),
-                "calibration_report.md": render_calibration_markdown(report),
-            },
-            overwrite=args.overwrite,
-        )
-    except (InputValidationError, CalibrationError, OSError, ValueError) as exc:
-        _print_error("input error", exc)
-        return int(ExitCode.INPUT_ERROR)
-    except OutputSafetyError as exc:
-        _print_error("output error", exc)
-        return int(ExitCode.OUTPUT_ERROR)
-    except KeyboardInterrupt:
-        return 130
-    except Exception as exc:
-        _print_error("internal error", type(exc).__name__)
-        return int(ExitCode.INTERNAL_ERROR)
-
-    print(
-        json.dumps(
-            {
-                "status": "pass" if report.passed else "fail",
-                "report": str(args.output_dir / "calibration_report.json"),
-            },
-            sort_keys=True,
-        )
-    )
-    return int(ExitCode.SUCCESS if report.passed else ExitCode.INTERNAL_ERROR)

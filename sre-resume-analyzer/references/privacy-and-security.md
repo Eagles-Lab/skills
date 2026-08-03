@@ -58,9 +58,9 @@ non-symlink.
 
 ## Retention
 
-Private raw documents, raw extraction, canonical staging, calibration samples,
-and calibration output belong in ignored access-controlled directories. Delete
-temporary raw extraction and canonical staging after verified publication.
+Private raw documents, raw extraction, and canonical staging belong in ignored
+access-controlled directories. Delete temporary raw extraction and canonical
+staging after verified publication.
 
 Final analysis remains personal data because directory and report content can
 identify a candidate. Do not commit it, attach it to CI, paste it into a PR, or

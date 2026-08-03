@@ -90,7 +90,6 @@ jobs:
           "$wheel_root/venv/bin/analyze-resume" --help >/dev/null
           "$wheel_root/venv/bin/extract-resume-text" --help >/dev/null
           "$wheel_root/venv/bin/batch-analyze" --help >/dev/null
-          "$wheel_root/venv/bin/calibrate-scoring" --help >/dev/null
           "$wheel_root/venv/bin/analyze-resume" \
             --extracted tests/fixtures/runtime_complete.json \
             --output-dir "$wheel_root/output"

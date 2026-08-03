@@ -81,8 +81,8 @@ not a quotation of a currently open Tencent role, a promise that Tencent uses
 these weights, or a conclusion about present hiring.
 
 AI receives 10% even if a particular public job description has not yet added
-equivalent language. This is an explicit forward-looking analyzer decision and
-must be validated by private calibration.
+equivalent language. This is an explicit forward-looking analyzer design
+choice, not an empirical claim about present hiring criteria.
 
 ## score.json contract
 
@@ -104,28 +104,13 @@ The public score artifact includes:
 
 There is no `base_score`, `ai_bonus`, legacy dimension, or per-dimension grade.
 
-## Private calibration CSV
+## Validation boundary
 
-```text
-resume_id,reviewer_id,systems_network_foundation,programming_automation,
-troubleshooting,cloud_distributed_infrastructure,reliability_engineering,
-ai_engineering_aiops,resume_quality,overall_grade,notes
-```
+Human-review calibration is not implemented or required in the current scope.
+Do not describe these scores as benchmarked accuracy, predicted performance,
+percentiles, or hiring recommendations. Keep `experimental` until maintainers
+explicitly adopt a different evidence-backed product status.
 
-Each of 40–60 de-identified domestic internship/campus resumes must receive one
-independent review from each of exactly two SRE reviewers. Reviewers must not
-see each other's score or analyzer output. Human technical total uses only the
-six fixed technical weights. Resume quality is compared separately.
-
-Required gates:
-
-- mean reviewer weighted kappa at least 0.70;
-- tool/human total Spearman at least 0.75;
-- median absolute total error at most 1.0;
-- overall grade agreement at least 80%;
-- Chinese/English semantic-equivalent difference at most 0.5;
-- negation examples do not exceed 4 in affected dimensions;
-- pure keyword stuffing does not reach B.
-
-Failed or unavailable calibration keeps the release experimental. Never pass a
-gate by editing expected results to match an implementation defect.
+Validate deterministic behavior directly: schema rejection, source grounding,
+Chinese and English matching, negation, coverage caps, security controls,
+atomic publication, and raw-document forward tests.
