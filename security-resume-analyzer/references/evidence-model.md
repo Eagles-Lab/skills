@@ -3,11 +3,12 @@
 Each dimension is divided into capability groups. Synonymous concepts collapse
 within a source. A skills-list or certificate name is mention-only.
 
-- Foundations: operating systems; network/HTTP/TLS; authentication and
-  cryptography; database/storage; security principles.
+- Foundations: Linux/Windows and OS mechanisms; network/HTTP/TLS;
+  authentication and cryptography; database/storage; security principles.
 - Engineering: programming; scripting/tools; testing; DevSecOps; data
   processing; security-tool audit.
-- Offensive: Web vulnerabilities; code audit; penetration methodology;
+- Vulnerability research and assessment: Web vulnerabilities; code audit;
+  binary/reverse, malware, mobile, IoT, and fuzzing; penetration methodology;
   reproduction; remediation validation; CTF/CVE/bounty.
 - Defense: logs/SIEM; network/endpoint detection; detection rules; incident
   response; threat hunting; forensics.

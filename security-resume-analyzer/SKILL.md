@@ -1,30 +1,21 @@
 ---
 name: security-resume-analyzer
-description: "Analyze Chinese internship and campus-hire security resumes for one explicitly selected track: appsec-offensive, defense-ir, or security-engineering-cloud. Map PDF, DOCX, Markdown, or supplied facts to canonical security schema v1, then run deterministic evidence scoring, cross-format candidate deduplication, resume-quality diagnosis, suggestions, and interview-question generation. Use for individual or batch campus security resume review and grounded interview preparation. Do not use for senior-role assessment, candidate ranking, hiring decisions, or any request without an explicit track."
+description: "Analyze Chinese internship and campus-hire security resumes with one general cn-campus-security-general profile. Map PDF, DOCX, Markdown, or supplied facts to canonical security schema v1, then run deterministic evidence scoring, cross-format candidate deduplication, resume-quality diagnosis, suggestions, and interview-question generation. Use for individual or batch campus security resume review and grounded interview preparation across vulnerability research, security engineering, operations, incident response, cloud security, and AI security. Do not use for senior-role assessment, candidate ranking, or hiring decisions."
 ---
 
 # Security Resume Analyzer
 
 ## Scope and status
 
-Use only for domestic security internships and campus hiring.
-
-Require exactly one target track:
-
-- `appsec-offensive`: application security, vulnerability research,
-  penetration testing, and authorized offensive practice;
-- `defense-ir`: security operations, detection, defense, forensics, and
-  incident response;
-- `security-engineering-cloud`: security development, platform engineering,
-  cloud, identity, data, and software supply-chain security.
-
-If the user has not selected a track, ask for it before scoring. Do not infer a
-track from the resume. Do not silently run all tracks and choose the highest.
+Use only for domestic security internships and campus hiring. Use the single
+`cn-campus-security-general` scoring profile. Do not request, infer, or display
+a target job track.
 
 Version 1.0.0 is `stable` for schema, CLI, determinism, privacy, path safety,
-and atomic output. Scoring is not human-calibrated. Every result must retain
-`calibration_status: "not_calibrated"`. Never claim scoring accuracy,
-percentile, job fit, predicted performance, rank, or hire/reject advice.
+and atomic output. Scoring is not human-calibrated. Retain
+`calibration_status: "not_calibrated"` in every result. Never claim scoring
+accuracy, percentile, job fit, predicted performance, rank, or hire/reject
+advice.
 
 Do not score identity or protected information. Name is used only for the
 private output path. School reputation, contact details, age, gender,
@@ -40,7 +31,7 @@ Before any run, read:
 
 Before scoring or explaining a score, also read:
 
-- [Three-track rubric](references/scoring-rubric.md)
+- [General campus-security rubric](references/scoring-rubric.md)
 - [Evidence model](references/evidence-model.md)
 
 Before a batch, also read:
@@ -100,8 +91,8 @@ Use exactly one path:
 5. Batch: place canonical v1 JSON documents in one private directory.
 
 Python performs deterministic validation, deduplication, scoring, rendering,
-and publication. It does not claim to identify resume facts directly from a
-PDF, DOCX, or Markdown document.
+and publication. It does not identify resume facts directly from a PDF, DOCX,
+or Markdown document.
 
 Stop on damaged or unreadable documents. Stop on scanned PDFs when an approved
 OCR capability is unavailable. Do not publish guesses or low-quality partial
@@ -139,16 +130,7 @@ Do not migrate or coerce them silently.
 ```bash
 uv run --frozen analyze-security-resume \
   --extracted ./resume.json \
-  --output-dir ./security-analysis \
-  --track appsec-offensive
-```
-
-Valid tracks are:
-
-```text
-appsec-offensive
-defense-ir
-security-engineering-cloud
+  --output-dir ./security-analysis
 ```
 
 `--output-dir` names the complete run root. It must not exist unless the user
@@ -166,7 +148,7 @@ Interpret exits:
 |---:|---|
 | 0 | All requested work succeeded. |
 | 1 | Unclassified internal error. |
-| 2 | Input, schema, track, or calibration-input error. |
+| 2 | Input, schema, or calibration-input error. |
 | 3 | Batch partially failed; successes and redacted summary were published. |
 | 4 | PDF extraction failed. |
 | 5 | Output conflict, unsafe path, or write failure. |
@@ -180,12 +162,8 @@ fabricating facts.
 uv run --frozen batch-analyze-security \
   --input-dir ./canonical-security-resumes \
   --output-dir ./security-batch \
-  --track defense-ir \
   --parallel 3
 ```
-
-Use one track for the whole batch. Split input directories when candidates
-target different tracks.
 
 Batch processing occurs in this order:
 
@@ -206,16 +184,20 @@ candidates. Exit 3 indicates a published partial batch.
 
 ## Score only explicit evidence
 
-All tracks use the same six dimension scores. The selected track changes only
-their weights. Each dimension reports:
+Use these fixed weights:
 
-- evidence items and their source IDs;
-- evidence group scores;
-- covered, applied, and missing groups;
-- `depth_score`;
-- `coverage_cap`;
-- final `score = min(depth_score, coverage_cap)`;
-- selected weight and weighted score.
+| Dimension | Weight |
+|---|---:|
+| Systems, network, and security foundations | 20% |
+| Programming, security engineering, and automation | 20% |
+| Vulnerability research and security assessment | 15% |
+| Detection, defense, and incident response | 20% |
+| Cloud, identity, data, and supply-chain security | 15% |
+| AI-assisted security and AI-system security | 10% |
+
+Each dimension reports evidence, source IDs, group scores, applied and missing
+groups, `depth_score`, `coverage_cap`, fixed weight, and final
+`score = min(depth_score, coverage_cap)`.
 
 Depth levels are 1, 2, 4, 6, 8, 9, and 10. Applied evidence-group counts 0,
 1, 2, and 3+ cap scores at 2, 8, 9, and 10 respectively. Repetition and
@@ -251,15 +233,12 @@ RUN_ROOT/
 └── batch_summary.json  # batch only
 ```
 
-The hash suffix is calculated from the sorted hashes of all sources in the
-deduplicated group. Missing name uses `未知姓名`.
-
 Confirm that:
 
 - each success has four analysis files and one ten-question file;
 - all JSON parses and source hashes agree;
-- `target_track` and actual weights match the request;
-- six weights total 100%;
+- `scoring_profile` is `cn-campus-security-general`;
+- six fixed weights total 100%;
 - `analyzer_status` is `stable`;
 - `calibration_status` is `not_calibrated`;
 - evidence groups, depth, cap, and final score are internally consistent;
@@ -283,9 +262,10 @@ the release calibration status requires a separately reviewed product change.
 
 ## Final response
 
-Report the track, run root, raw file count, unique candidate count, successful
-and failed counts, deduplicated source count, and conflict count. Do not echo
-candidate names, contacts, resume text, or private output contents in chat.
+Report the scoring profile, run root, raw file count, unique candidate count,
+successful and failed counts, deduplicated source count, and conflict count.
+Do not echo candidate names, contacts, resume text, or private output contents
+in chat.
 
 Repeat that scores are not calibrated and cannot be used for ranking or hiring
 decisions.

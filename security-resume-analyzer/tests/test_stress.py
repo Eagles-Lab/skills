@@ -6,7 +6,6 @@ from pathlib import Path
 
 from security_resume_analyzer.analyzer import SecurityResumeAnalyzer, load_resume
 from security_resume_analyzer.batch import BatchProcessor
-from security_resume_analyzer.models import Track
 from security_resume_analyzer.output import sha256_file
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -17,9 +16,7 @@ def test_one_hundred_artifact_builds_are_semantically_identical(tmp_path: Path) 
     source = FIXTURES / "complete.json"
     resume = load_resume(source)
     digest = sha256_file(source)
-    analyzer = SecurityResumeAnalyzer(
-        tmp_path / "unused", Track.appsec_offensive, clock=lambda: FIXED
-    )
+    analyzer = SecurityResumeAnalyzer(tmp_path / "unused", clock=lambda: FIXED)
     baseline = analyzer.build_artifacts(resume, (digest,), seed="stable")
     expected = {
         "score": baseline.score,
@@ -42,7 +39,7 @@ def test_batch_processor_reuse_has_no_historical_state(tmp_path: Path) -> None:
     inputs.mkdir()
     (inputs / "one.json").write_text(json.dumps({"basic_info": {"name": "同学"}}))
     output = tmp_path / "run"
-    processor = BatchProcessor(output, Track.defense_ir, overwrite=True, clock=lambda: FIXED)
+    processor = BatchProcessor(output, overwrite=True, clock=lambda: FIXED)
     first = processor.process_directory(inputs)
     second = processor.process_directory(inputs)
     assert first == second

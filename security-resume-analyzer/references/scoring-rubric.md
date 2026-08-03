@@ -1,27 +1,43 @@
-# Three-track campus security scoring rubric
+# General campus-security scoring rubric
 
-This product taxonomy is informed by the [NIST NICE Framework
+The single scoring profile is `cn-campus-security-general`. It is designed for
+Chinese security internships and campus hiring; it does not select or infer a
+job track.
+
+The product taxonomy is informed by the [NIST NICE Framework
 2.2.0](https://www.nist.gov/itl/applied-cybersecurity/nice/nice-framework-resource-center/nice-framework-current-versions),
 [NIST CSF 2.0](https://www.nist.gov/news-events/news/2024/02/nist-releases-version-20-landmark-cybersecurity-framework),
 [OWASP ASVS 5.0](https://owasp.org/www-project-application-security-verification-standard/),
 [MITRE ATT&CK](https://attack.mitre.org/tactics/), and [OWASP LLM Top 10
-2025](https://genai.owasp.org/download/43299/?tmstv=1731900559). Reference
-snapshot: 2026-08-02.
+2025](https://genai.owasp.org/download/43299/?tmstv=1731900559).
 
-The dimensions and weights are analyzer product decisions. They are not a
-framework mapping, employer standard, hiring conclusion, or calibrated model.
+The 2026-08-03 hiring-demand snapshot also reviewed:
 
-| Dimension | AppSec/offensive | Defense/IR | Security engineering/cloud |
-|---|---:|---:|---:|
-| Systems, network, security foundations | 20% | 20% | 20% |
-| Programming, security engineering, automation | 15% | 15% | 25% |
-| Application security and offensive practice | 30% | 10% | 10% |
-| Detection, defense, incident response | 10% | 30% | 10% |
-| Cloud, identity, data, supply chain | 15% | 15% | 25% |
-| AI-assisted security and AI-system security | 10% | 10% | 10% |
+- [QIANXIN technical security roles](https://research.qianxin.com/recruitment),
+  which emphasize computer/network foundations, protocols, programming,
+  security research, prototypes, reverse engineering, and AI;
+- [360 security engineering and internship roles](https://src.360.cn/News/news/id/371),
+  which cover vulnerabilities, Linux/logs, programming, detection, response,
+  cloud-native security, automation, and AI-assisted operations;
+- [Sangfor security-service capability baseline](https://www.sangfor.com.cn/security-service/safety-training-service/t2-training),
+  which covers assessment, penetration testing, incident response, delivery,
+  and AI/SOAR-enabled services;
+- [NSFOCUS 2026 campus job families](https://career.hebut.edu.cn/home/correcruit/content/id/75397.html),
+  which span research, development, assessment, application security,
+  offensive security, operations, and service roles.
 
-Track selection changes weights only. Evidence matching and dimension depth do
-not change between tracks.
+These sources guide capability coverage only. The weights are analyzer product
+decisions, not a statistical job-posting frequency, employer standard,
+framework mapping, hiring conclusion, or calibrated model.
+
+| Dimension | Weight |
+|---|---:|
+| Systems, network, and security foundations | 20% |
+| Programming, security engineering, and automation | 20% |
+| Vulnerability research and security assessment | 15% |
+| Detection, defense, and incident response | 20% |
+| Cloud, identity, data, and supply-chain security | 15% |
+| AI-assisted security and AI-system security | 10% |
 
 Resume quality has weight zero. It diagnoses personal contribution,
 authorization, method, verification/remediation, and internal consistency.
@@ -29,10 +45,10 @@ authorization, method, verification/remediation, and internal consistency.
 All outputs declare `calibration_status: not_calibrated`. The overall letter
 grade is a compact evidence-coverage label only and must not rank candidates.
 
-Private calibration CSV requires `resume_id`, `reviewer_id`, `track`, the six
-dimension keys, `resume_quality`, `overall_grade`, and `notes`. Each candidate
-must have exactly two different blinded reviewers using the same explicit
-track. Reviewers must not see each other's scores or analyzer results.
+Private calibration CSV requires `resume_id`, `reviewer_id`, the six dimension
+keys, `resume_quality`, `overall_grade`, and `notes`. Each candidate must have
+exactly two different blinded reviewers. Reviewers must not see each other's
+scores or analyzer results.
 
 The calibration report measures reviewer agreement, tool-human Spearman,
 median absolute error, grade agreement, and per-dimension mean absolute error.

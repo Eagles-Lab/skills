@@ -8,19 +8,16 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints
 
 SCHEMA_VERSION: Literal["1.0"] = "1.0"
-SCORING_CONFIG_VERSION: Literal["cn-campus-security-1.0.0"] = "cn-campus-security-1.0.0"
-
-
-class Track(StrEnum):
-    appsec_offensive = "appsec-offensive"
-    defense_ir = "defense-ir"
-    security_engineering_cloud = "security-engineering-cloud"
+SCORING_PROFILE: Literal["cn-campus-security-general"] = "cn-campus-security-general"
+SCORING_CONFIG_VERSION: Literal["cn-campus-security-general-1.0.0"] = (
+    "cn-campus-security-general-1.0.0"
+)
 
 
 DimensionName = Literal[
     "systems_network_security_foundation",
     "programming_security_engineering_automation",
-    "application_security_offensive",
+    "vulnerability_research_security_assessment",
     "detection_defense_incident_response",
     "cloud_identity_data_supply_chain",
     "ai_assisted_security_ai_system_security",
@@ -221,8 +218,8 @@ class GradeInfo(StrictModel):
 
 class ScoreResult(StrictModel):
     schema_version: Literal["1.0"] = SCHEMA_VERSION
-    scoring_config_version: Literal["cn-campus-security-1.0.0"] = SCORING_CONFIG_VERSION
-    target_track: Track
+    scoring_profile: Literal["cn-campus-security-general"] = SCORING_PROFILE
+    scoring_config_version: Literal["cn-campus-security-general-1.0.0"] = SCORING_CONFIG_VERSION
     dimension_weights: dict[DimensionName, float]
     total_score: float = Field(ge=1.0, le=10.0)
     dimension_scores: dict[DimensionName, DimensionScore]

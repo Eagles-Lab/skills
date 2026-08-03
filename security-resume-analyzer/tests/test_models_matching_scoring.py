@@ -7,16 +7,17 @@ import pytest
 from pydantic import ValidationError
 
 from security_resume_analyzer.matching import (
+    DIMENSION_CONCEPTS,
     EvidenceMatcher,
     classify_evidence,
     is_unauthorized,
     normalize_text,
     term_pattern,
 )
-from security_resume_analyzer.models import EvidenceLevel, Resume, Track
+from security_resume_analyzer.models import Evidence, EvidenceLevel, Resume, SecurityEnvironment
 from security_resume_analyzer.scoring import (
+    DIMENSION_WEIGHTS,
     DIMENSIONS,
-    TRACK_WEIGHTS,
     ScoreCalculator,
     coverage_cap,
 )
@@ -81,6 +82,31 @@ def test_repeated_terms_are_one_evidence_per_source_and_concept() -> None:
     assert len([item for item in evidence if item.concept == "programming"]) == 1
 
 
+@pytest.mark.parametrize(
+    "description",
+    [
+        "在授权实验环境使用 IDA Pro 逆向分析恶意代码，并用 Fuzzing 复现 IoT 固件漏洞后修复复测。",
+        "Used Ghidra for malware analysis and fuzzing to reproduce an Android security flaw in an authorized lab.",
+    ],
+)
+def test_general_vulnerability_research_matches_binary_malware_mobile_and_fuzzing(
+    description: str,
+) -> None:
+    resume = Resume.model_validate(
+        {"security_activities": [{"environment": "authorized", "description": description}]}
+    )
+    concepts = {
+        item.concept
+        for item in EvidenceMatcher().find_evidence(
+            resume, "vulnerability_research_security_assessment"
+        )
+    }
+    assert "binary_reverse" in concepts
+    assert "malware_analysis" in concepts
+    assert "vulnerability_discovery" in concepts
+    assert "mobile_iot" in concepts
+
+
 def test_instruction_and_illegal_claim_do_not_score() -> None:
     resume = Resume.model_validate(
         {
@@ -92,8 +118,8 @@ def test_instruction_and_illegal_claim_do_not_score() -> None:
             ]
         }
     )
-    score = ScoreCalculator(Track.appsec_offensive).calculate(resume)
-    assert score.dimension_scores["application_security_offensive"].score == 1.0
+    score = ScoreCalculator().calculate(resume)
+    assert score.dimension_scores["vulnerability_research_security_assessment"].score == 1.0
     assert is_unauthorized("未经授权攻击")
 
 
@@ -112,15 +138,15 @@ def test_evidence_depth_classification(text: str, level: EvidenceLevel) -> None:
     assert classify_evidence(text) is level
 
 
-def test_three_tracks_have_fixed_weights_and_same_depth() -> None:
-    resume = load()
-    results = [ScoreCalculator(track).calculate(resume) for track in Track]
-    for track in Track:
-        assert sum(TRACK_WEIGHTS[track].values()) == pytest.approx(1.0)
-    for dimension in DIMENSIONS:
-        assert len({result.dimension_scores[dimension].depth_score for result in results}) == 1
-        assert len({result.dimension_scores[dimension].score for result in results}) == 1
-    assert len({result.total_score for result in results}) > 1
+def test_general_profile_has_fixed_weights() -> None:
+    score = ScoreCalculator().calculate(load())
+    assert score.scoring_profile == "cn-campus-security-general"
+    assert score.scoring_config_version == "cn-campus-security-general-1.0.0"
+    assert (
+        dict(zip(DIMENSIONS, (0.20, 0.20, 0.15, 0.20, 0.15, 0.10), strict=True))
+        == DIMENSION_WEIGHTS
+    )
+    assert sum(DIMENSION_WEIGHTS.values()) == pytest.approx(1.0)
 
 
 @pytest.mark.parametrize(("groups", "cap"), [(0, 2.0), (1, 8.0), (2, 9.0), (3, 10.0), (8, 10.0)])
@@ -128,14 +154,125 @@ def test_coverage_caps(groups: int, cap: float) -> None:
     assert coverage_cap(groups) == cap
 
 
+def _evidence(
+    dimension: str,
+    group: str,
+    source_id: str,
+    level: EvidenceLevel,
+    context: str,
+    *,
+    source_kind: str = "project",
+) -> Evidence:
+    return Evidence.model_validate(
+        {
+            "dimension": dimension,
+            "concept": f"concept-{group}",
+            "evidence_group": group,
+            "source_kind": source_kind,
+            "source_id": source_id,
+            "context": context,
+            "level": level,
+            "position": 0,
+            "quantified": "20%" in context,
+            "authorization": SecurityEnvironment.authorized,
+        }
+    )
+
+
+@pytest.mark.parametrize("dimension", DIMENSIONS)
+@pytest.mark.parametrize("expected", [1.0, 2.0, 4.0, 6.0, 8.0, 9.0, 10.0])
+def test_every_dimension_supports_all_depth_boundaries(dimension: str, expected: float) -> None:
+    groups = list(DIMENSION_CONCEPTS[dimension])
+    ordinary = {
+        4.0: "使用安全技术进行分析。",
+        6.0: "实现可运行的安全工具。",
+        8.0: "负责设计方法并验证修复闭环。",
+        9.0: "负责设计方法并在生产环境验证修复，发现问题降低 20%。",
+    }
+    ai = {
+        4.0: "使用 Agent 辅助安全分析并人工确认结果。",
+        6.0: "实现 Agent 安全工作流进行自动分析。",
+        8.0: "实现 Agent 安全工作流，使用评测集验证并配置权限隔离和降级。",
+        9.0: "实现生产环境 Agent 安全工作流，使用评测集验证并配置权限隔离和降级，误报降低 20%。",
+    }
+    if expected == 1.0:
+        resume = Resume()
+        evidence: list[Evidence] = []
+    elif expected == 2.0:
+        resume = Resume()
+        evidence = [
+            _evidence(
+                dimension,
+                groups[0],
+                "skills:test",
+                EvidenceLevel.mention,
+                "工具提及",
+                source_kind="skills",
+            )
+        ]
+    else:
+        text = (ai if dimension == "ai_assisted_security_ai_system_security" else ordinary)[
+            min(expected, 9.0)
+        ]
+        projects = [{"description": text}]
+        group_count = 2 if expected == 9.0 else 1
+        evidence = [
+            _evidence(
+                dimension,
+                groups[index],
+                "project:0",
+                EvidenceLevel.usage if expected == 4.0 else EvidenceLevel.implementation,
+                text,
+            )
+            for index in range(group_count)
+        ]
+        if expected == 10.0:
+            second_text = (
+                "实现第二个 Agent 安全工作流并完成验证。"
+                if dimension == "ai_assisted_security_ai_system_security"
+                else "实现第二个可运行安全工具并完成验证。"
+            )
+            projects.append({"description": second_text})
+            evidence = [
+                _evidence(
+                    dimension,
+                    groups[0],
+                    "project:0",
+                    EvidenceLevel.implementation,
+                    (ai if dimension == "ai_assisted_security_ai_system_security" else ordinary)[
+                        9.0
+                    ],
+                ),
+                _evidence(
+                    dimension,
+                    groups[1],
+                    "project:0",
+                    EvidenceLevel.implementation,
+                    (ai if dimension == "ai_assisted_security_ai_system_security" else ordinary)[
+                        9.0
+                    ],
+                ),
+                _evidence(
+                    dimension,
+                    groups[2],
+                    "project:1",
+                    EvidenceLevel.implementation,
+                    second_text,
+                ),
+            ]
+        resume = Resume.model_validate({"projects": projects})
+    item = ScoreCalculator()._score_dimension(dimension, evidence, resume)
+    assert item.score == expected
+
+
 def test_skill_lists_are_mentions_and_cap_at_two() -> None:
     resume = Resume.model_validate(
         {"skills": {"appsec_offensive": ["SSRF", "代码审计", "Burp Suite"]}}
     )
     item = (
-        ScoreCalculator(Track.appsec_offensive)
+        ScoreCalculator()
         .calculate(resume)
-        .dimension_scores["application_security_offensive"]
+        .dimension_scores["vulnerability_research_security_assessment"]
     )
     assert item.depth_score == 2.0
     assert item.coverage_cap == 2.0
@@ -155,7 +292,7 @@ def test_certification_activity_is_mention_only() -> None:
         }
     )
     key = "cloud_identity_data_supply_chain"
-    item = ScoreCalculator(Track.security_engineering_cloud).calculate(resume).dimension_scores[key]
+    item = ScoreCalculator().calculate(resume).dimension_scores[key]
     assert item.depth_score == 2.0
     assert item.applied_evidence_groups == []
 
@@ -172,9 +309,9 @@ def test_unknown_authorization_caps_offensive_at_four() -> None:
         }
     )
     item = (
-        ScoreCalculator(Track.appsec_offensive)
+        ScoreCalculator()
         .calculate(resume)
-        .dimension_scores["application_security_offensive"]
+        .dimension_scores["vulnerability_research_security_assessment"]
     )
     assert item.depth_score == 4.0
 
@@ -192,9 +329,9 @@ def test_ctf_reproducible_lab_can_reach_six() -> None:
         }
     )
     item = (
-        ScoreCalculator(Track.appsec_offensive)
+        ScoreCalculator()
         .calculate(resume)
-        .dimension_scores["application_security_offensive"]
+        .dimension_scores["vulnerability_research_security_assessment"]
     )
     assert item.depth_score == 6.0
 
@@ -214,13 +351,13 @@ def test_keyword_stuffing_cannot_reach_b() -> None:
             }
         }
     )
-    assert ScoreCalculator(Track.appsec_offensive).calculate(resume).grade.grade == "F"
+    assert ScoreCalculator().calculate(resume).grade.grade == "F"
 
 
 def test_authorized_complete_loop_and_real_result() -> None:
     resume = load()
-    score = ScoreCalculator(Track.appsec_offensive).calculate(resume)
-    offensive = score.dimension_scores["application_security_offensive"]
+    score = ScoreCalculator().calculate(resume)
+    offensive = score.dimension_scores["vulnerability_research_security_assessment"]
     assert offensive.depth_score >= 9.0
     assert offensive.evidence_coverage > 0
     assert offensive.score == min(offensive.depth_score, offensive.coverage_cap)
@@ -236,21 +373,15 @@ def test_ai_mentions_usage_workflow_and_guardrails() -> None:
     )
     guarded = load()
     key = "ai_assisted_security_ai_system_security"
-    assert (
-        ScoreCalculator(Track.defense_ir).calculate(mention).dimension_scores[key].depth_score == 2
-    )
-    assert ScoreCalculator(Track.defense_ir).calculate(used).dimension_scores[key].depth_score == 4
-    assert (
-        ScoreCalculator(Track.defense_ir).calculate(workflow).dimension_scores[key].depth_score == 6
-    )
-    assert (
-        ScoreCalculator(Track.defense_ir).calculate(guarded).dimension_scores[key].depth_score >= 8
-    )
+    assert ScoreCalculator().calculate(mention).dimension_scores[key].depth_score == 2
+    assert ScoreCalculator().calculate(used).dimension_scores[key].depth_score == 4
+    assert ScoreCalculator().calculate(workflow).dimension_scores[key].depth_score == 6
+    assert ScoreCalculator().calculate(guarded).dimension_scores[key].depth_score >= 8
 
 
 def test_resume_quality_is_independent() -> None:
-    empty = ScoreCalculator(Track.defense_ir).calculate(Resume()).resume_quality
-    complete = ScoreCalculator(Track.defense_ir).calculate(load()).resume_quality
+    empty = ScoreCalculator().calculate(Resume()).resume_quality
+    complete = ScoreCalculator().calculate(load()).resume_quality
     assert empty.score == 1.0
     assert complete.score > empty.score
     assert complete.weight == 0.0

@@ -10,13 +10,12 @@ from typing import Any, Mapping
 
 from jinja2 import Environment, FileSystemLoader, PackageLoader, StrictUndefined, TemplateError
 
-from .models import Track
 from .security import sanitize_included_contact_text, sanitize_report_text
 
 DIMENSION_LABELS = {
     "systems_network_security_foundation": "系统、网络与安全基础",
     "programming_security_engineering_automation": "编程、安全工程与自动化",
-    "application_security_offensive": "应用安全与攻防实践",
+    "vulnerability_research_security_assessment": "漏洞研究与安全评估实践",
     "detection_defense_incident_response": "检测、防御与应急响应",
     "cloud_identity_data_supply_chain": "云、身份、数据与供应链安全",
     "ai_assisted_security_ai_system_security": "AI 辅助安全与 AI 系统安全",
@@ -35,6 +34,7 @@ GROUP_LABELS = {
     "security_tool_audit": "安全工具审计",
     "web_vulnerabilities": "Web 漏洞",
     "code_audit": "代码审计",
+    "binary_system_mobile_iot": "二进制/系统/移动与 IoT 安全",
     "penetration_methodology": "渗透方法",
     "reproduction": "漏洞复现",
     "remediation_validation": "修复验证",
@@ -85,10 +85,10 @@ QUESTION_BANK = {
         "如何验证自动化扫描没有放大误报风险？",
         "代码审查如何识别并修复安全缺陷？",
     ],
-    "application_security_offensive": [
+    "vulnerability_research_security_assessment": [
         "请在明确授权边界后描述一次漏洞复现与修复复测。",
         "代码审计如何从入口追踪到危险汇点？",
-        "渗透测试中如何控制影响并保留证据？",
+        "二进制、移动或 IoT 漏洞研究中如何复现并控制影响？",
     ],
     "detection_defense_incident_response": [
         "设计一条检测规则并说明误报验证。",
@@ -190,7 +190,7 @@ class ReportRenderer:
             "clarity_consistency": "表述一致性",
         }
         common = {
-            "target_track": score["target_track"],
+            "scoring_profile": score["scoring_profile"],
             "analyzer_version": analyzer_version,
             "security_warnings": security_warnings,
         }
@@ -213,7 +213,7 @@ class ReportRenderer:
             )
             questions = self.environment.get_template("interview_questions_template.md").render(
                 **common,
-                questions=self._questions(Track(score["target_track"]), score, seed),
+                questions=self._questions(score, seed),
             )
         except TemplateError as exc:
             raise RenderingError(
@@ -221,31 +221,33 @@ class ReportRenderer:
             ) from exc
         return RenderedReports(suggestions, questions)
 
-    def _questions(self, track: Track, score: Mapping[str, Any], seed: str) -> list[dict[str, Any]]:
+    def _questions(self, score: Mapping[str, Any], seed: str) -> list[dict[str, Any]]:
         rng = random.Random(int.from_bytes(hashlib.sha256(seed.encode()).digest()[:8], "big"))
         dimensions = sorted(
             DIMENSION_LABELS, key=lambda key: (score["dimension_scores"][key]["score"], key)
         )
+        required = (
+            "systems_network_security_foundation",
+            "programming_security_engineering_automation",
+            "vulnerability_research_security_assessment",
+            "ai_assisted_security_ai_system_security",
+        )
+        selected = [(DIMENSION_LABELS[key], rng.choice(QUESTION_BANK[key])) for key in required]
         pool = [
-            (DIMENSION_LABELS[key], question)
+            (key, DIMENSION_LABELS[key], question)
             for key in dimensions
             for question in QUESTION_BANK[key]
+            if (DIMENSION_LABELS[key], question) not in selected
         ]
-        track_question = {
-            Track.appsec_offensive: "如何证明一次攻防实践处于明确授权范围？",
-            Track.defense_ir: "如何定义事件处置完成并验证没有残留风险？",
-            Track.security_engineering_cloud: "如何把安全控制集成进交付链且支持回滚？",
-        }[track]
-        pool.extend(
-            [
-                ("目标轨道", track_question),
-                ("综合", "选择一个项目，区分个人贡献、方法、验证和结果。"),
-            ]
-        )
         rng.shuffle(pool)
+        priority = {key: index for index, key in enumerate(dimensions)}
+        pool.sort(key=lambda item: priority[item[0]])
+        selected.extend((label, question) for _, label, question in pool[:5])
+        selected.append(("综合", "选择一个项目，区分个人贡献、方法、验证和结果。"))
+        rng.shuffle(selected)
         return [
             {"id": index, "category": category, "question": question}
-            for index, (category, question) in enumerate(pool[:10], 1)
+            for index, (category, question) in enumerate(selected, 1)
         ]
 
 

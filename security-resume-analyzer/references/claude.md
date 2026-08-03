@@ -14,4 +14,5 @@ when a fact or authorization scope is not reliable.
 
 For an isolated forward-test, give a fresh Claude context only this Skill and a
 deidentified raw document. Do not reveal expected fields or scores. Verify the
-canonical schema, target track, output layout, privacy, and calibration notice.
+canonical schema, general scoring profile, output layout, privacy, and
+calibration notice.

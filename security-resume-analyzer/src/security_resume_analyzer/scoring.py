@@ -1,4 +1,4 @@
-"""Three-track deterministic security evidence scoring."""
+"""Deterministic general campus-security evidence scoring."""
 
 from __future__ import annotations
 
@@ -23,28 +23,21 @@ from .models import (
     ResumeQualityDiagnostic,
     ScoreResult,
     SecurityEnvironment,
-    Track,
 )
 from .security import is_instruction_like
 
 DIMENSIONS: tuple[DimensionName, ...] = (
     "systems_network_security_foundation",
     "programming_security_engineering_automation",
-    "application_security_offensive",
+    "vulnerability_research_security_assessment",
     "detection_defense_incident_response",
     "cloud_identity_data_supply_chain",
     "ai_assisted_security_ai_system_security",
 )
 
-TRACK_WEIGHTS: dict[Track, dict[DimensionName, float]] = {
-    Track.appsec_offensive: dict(
-        zip(DIMENSIONS, (0.20, 0.15, 0.30, 0.10, 0.15, 0.10), strict=True)
-    ),
-    Track.defense_ir: dict(zip(DIMENSIONS, (0.20, 0.15, 0.10, 0.30, 0.15, 0.10), strict=True)),
-    Track.security_engineering_cloud: dict(
-        zip(DIMENSIONS, (0.20, 0.25, 0.10, 0.10, 0.25, 0.10), strict=True)
-    ),
-}
+DIMENSION_WEIGHTS: dict[DimensionName, float] = dict(
+    zip(DIMENSIONS, (0.20, 0.20, 0.15, 0.20, 0.15, 0.10), strict=True)
+)
 
 LEVEL_SCORE = {
     EvidenceLevel.mention: 2.0,
@@ -99,9 +92,8 @@ def coverage_cap(applied_group_count: int) -> float:
 
 
 class ScoreCalculator:
-    def __init__(self, track: Track | str, matcher: EvidenceMatcher | None = None) -> None:
-        self.track = Track(track)
-        self.weights = TRACK_WEIGHTS[self.track]
+    def __init__(self, matcher: EvidenceMatcher | None = None) -> None:
+        self.weights = DIMENSION_WEIGHTS
         self.matcher = matcher or EvidenceMatcher()
 
     def calculate(self, resume: Resume) -> ScoreResult:
@@ -115,7 +107,6 @@ class ScoreCalculator:
             max(1.0, min(10.0, sum(item.weighted_score for item in dimensions.values()))), 1
         )
         return ScoreResult(
-            target_track=self.track,
             dimension_weights=self.weights,
             total_score=total,
             dimension_scores=dimensions,
@@ -209,7 +200,9 @@ class ScoreCalculator:
             and (is_quantified(text) or any(item.quantified for item in evidence))
         ):
             score = 9.0
-        if dimension == "application_security_offensive" and not _authorized_source(evidence, text):
+        if dimension == "vulnerability_research_security_assessment" and not _authorized_source(
+            evidence, text
+        ):
             score = min(score, 4.0)
         return score
 

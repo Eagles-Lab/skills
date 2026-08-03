@@ -11,7 +11,7 @@ from typing import Any, Callable
 from .analyzer import AnalysisArtifacts, SecurityResumeAnalyzer, load_resume
 from .dedup import IdentityConflictError, MergedCandidate, ResumeSource, merge_candidates
 from .errors import InputValidationError, OutputConflictError, OutputSafetyError
-from .models import Track
+from .models import SCORING_PROFILE
 from .output import sha256_file, write_run_output
 
 
@@ -23,7 +23,6 @@ class BatchProcessor:
     def __init__(
         self,
         output_dir: Path,
-        track: Track | str,
         *,
         max_workers: int = 3,
         overwrite: bool = False,
@@ -32,7 +31,6 @@ class BatchProcessor:
         if max_workers < 1:
             raise ValueError("max_workers must be at least 1")
         self.output_dir = Path(output_dir)
-        self.track = Track(track)
         self.max_workers = max_workers
         self.overwrite = overwrite
         self.clock = clock or (lambda: datetime.now(UTC))
@@ -107,7 +105,7 @@ class BatchProcessor:
         )
         summary = {
             "schema_version": "1.0",
-            "target_track": self.track.value,
+            "scoring_profile": SCORING_PROFILE,
             "generated_at": generated_at,
             "raw_file_count": len(files),
             "unique_candidate_count": len(candidates) + len(identity_failures),
@@ -128,7 +126,7 @@ class BatchProcessor:
         return summary
 
     def _process_one(self, candidate: MergedCandidate) -> AnalysisArtifacts:
-        analyzer = SecurityResumeAnalyzer(self.output_dir, self.track, clock=self.clock)
+        analyzer = SecurityResumeAnalyzer(self.output_dir, clock=self.clock)
         return analyzer.build_artifacts(
             candidate.resume,
             candidate.source_hashes,

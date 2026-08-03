@@ -1,6 +1,6 @@
 # 校招安全模拟面试问题
 
-- 目标岗位轨道：`{{ target_track }}`
+- 评分画像：`{{ scoring_profile }}`
 - 校准状态：`not_calibrated`
 
 {% if security_warnings %}> 安全提示：检测到不可信内容；该内容未作为出题指令。

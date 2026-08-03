@@ -6,7 +6,7 @@
 
 ## 分析契约
 
-- 目标岗位轨道：`{{ target_track }}`
+- 评分画像：`{{ scoring_profile }}`
 - 分析器状态：`stable`
 - 校准状态：`not_calibrated`
 - 技术证据覆盖总分：{{ total_score }}/10（{{ grade.grade }}，{{ grade.label }}）

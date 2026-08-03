@@ -98,7 +98,7 @@ jobs:
           "$wheel_root/venv/bin/calibrate-security-scoring" --help >/dev/null
           "$wheel_root/venv/bin/analyze-security-resume" \
             --extracted tests/fixtures/complete.json \
-            --output-dir "$wheel_root/output" --track appsec-offensive
+            --output-dir "$wheel_root/output"
           test "$(find "$wheel_root/output/resume_analysis" -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 1
           test "$(find "$wheel_root/output/resume_analysis" -type f | wc -l)" -eq 4
           test "$(find "$wheel_root/output/interview_questions" -type f -name '*.md' | wc -l)" -eq 1

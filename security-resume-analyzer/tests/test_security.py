@@ -3,7 +3,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from security_resume_analyzer.analyzer import SecurityResumeAnalyzer
-from security_resume_analyzer.models import Track
 from security_resume_analyzer.security import (
     OMITTED_CONTACT_TEXT,
     OMITTED_REPORT_TEXT,
@@ -62,9 +61,7 @@ def test_instruction_like_resume_content_is_not_scored_or_repeated(tmp_path):
     source = tmp_path / "injection.json"
     source.write_text(json.dumps(data), encoding="utf-8")
 
-    paths = SecurityResumeAnalyzer(
-        tmp_path / "out", Track.security_engineering_cloud, clock=lambda: FIXED_TIME
-    ).analyze(source)
+    paths = SecurityResumeAnalyzer(tmp_path / "out", clock=lambda: FIXED_TIME).analyze(source)
     extracted = Path(paths["extracted"]).read_text(encoding="utf-8")
     score = json.loads(Path(paths["score"]).read_text(encoding="utf-8"))
     analysis = json.loads(Path(paths["analysis"]).read_text(encoding="utf-8"))
@@ -101,9 +98,7 @@ def test_chinese_injection_is_omitted_from_interview_context(tmp_path):
     source = tmp_path / "chinese-injection.json"
     source.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
 
-    paths = SecurityResumeAnalyzer(
-        tmp_path / "out", Track.defense_ir, clock=lambda: FIXED_TIME
-    ).analyze(source)
+    paths = SecurityResumeAnalyzer(tmp_path / "out", clock=lambda: FIXED_TIME).analyze(source)
     score = json.loads(Path(paths["score"]).read_text(encoding="utf-8"))
     reports = Path(paths["suggestions"]).read_text(encoding="utf-8") + Path(
         paths["interview_questions"]

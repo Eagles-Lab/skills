@@ -24,10 +24,34 @@ DimensionConcepts = dict[str, dict[str, dict[str, tuple[str, ...]]]]
 DIMENSION_CONCEPTS: DimensionConcepts = {
     "systems_network_security_foundation": {
         "operating_systems": {
-            "operating_systems": ("linux", "unix", "进程", "线程", "文件系统", "内存管理"),
+            "operating_systems": (
+                "linux",
+                "unix",
+                "windows internals",
+                "windows 内核",
+                "进程",
+                "线程",
+                "文件系统",
+                "虚拟内存",
+                "内存管理",
+                "系统调用",
+                "pe 文件",
+                "elf 文件",
+            ),
         },
         "network_http_tls": {
-            "networking": ("tcp/ip", "tcp", "udp", "dns", "http", "https", "tls", "网络协议"),
+            "networking": (
+                "tcp/ip",
+                "tcp",
+                "udp",
+                "dns",
+                "http",
+                "https",
+                "tls",
+                "路由",
+                "交换",
+                "网络协议",
+            ),
         },
         "authentication_cryptography": {
             "authentication": ("authentication", "认证", "oauth", "oidc", "jwt"),
@@ -56,6 +80,7 @@ DIMENSION_CONCEPTS: DimensionConcepts = {
                 "golang",
                 "go",
                 "java",
+                "c",
                 "c++",
                 "rust",
                 "javascript",
@@ -64,7 +89,7 @@ DIMENSION_CONCEPTS: DimensionConcepts = {
         },
         "scripting_tools": {
             "scripting": ("shell", "bash", "powershell", "脚本", "自动化"),
-            "tooling": ("cli", "sdk", "api", "工具", "工具开发"),
+            "tooling": ("cli", "sdk", "api", "工具", "工具开发", "安全工具开发"),
         },
         "testing": {
             "testing": (
@@ -87,6 +112,8 @@ DIMENSION_CONCEPTS: DimensionConcepts = {
                 "dast",
                 "iac scanning",
                 "依赖扫描",
+                "git",
+                "版本控制",
             ),
         },
         "data_processing": {
@@ -96,7 +123,7 @@ DIMENSION_CONCEPTS: DimensionConcepts = {
             "tool_audit": ("code review", "代码审查", "安全工具评估", "规则验证", "误报分析"),
         },
     },
-    "application_security_offensive": {
+    "vulnerability_research_security_assessment": {
         "web_vulnerabilities": {
             "web_vulnerabilities": (
                 "sql injection",
@@ -113,6 +140,46 @@ DIMENSION_CONCEPTS: DimensionConcepts = {
         },
         "code_audit": {
             "code_audit": ("code audit", "source code audit", "代码审计", "污点分析", "静态分析"),
+        },
+        "binary_system_mobile_iot": {
+            "binary_reverse": (
+                "binary security",
+                "二进制安全",
+                "逆向分析",
+                "reverse engineering",
+                "ida pro",
+                "ghidra",
+                "gdb",
+                "windbg",
+                "pwn",
+            ),
+            "malware_analysis": (
+                "malware analysis",
+                "malware",
+                "恶意代码分析",
+                "恶意代码",
+                "病毒分析",
+                "样本分析",
+                "沙箱分析",
+            ),
+            "mobile_iot": (
+                "mobile security",
+                "移动安全",
+                "android security",
+                "ios security",
+                "iot security",
+                "iot",
+                "物联网安全",
+                "固件分析",
+                "固件",
+            ),
+            "vulnerability_discovery": (
+                "fuzzing",
+                "fuzz",
+                "模糊测试",
+                "symbolic execution",
+                "符号执行",
+            ),
         },
         "penetration_methodology": {
             "penetration": (
@@ -150,7 +217,15 @@ DIMENSION_CONCEPTS: DimensionConcepts = {
                 "zeek",
                 "suricata",
             ),
-            "endpoint_detection": ("edr", "endpoint detection", "主机检测", "sysmon"),
+            "endpoint_detection": (
+                "edr",
+                "endpoint detection",
+                "主机检测",
+                "sysmon",
+                "恶意代码检测",
+                "病毒检测",
+                "沙箱检测",
+            ),
         },
         "detection_rules": {
             "detection_rules": ("sigma", "yara", "snort rule", "检测规则", "告警规则", "关联规则"),
@@ -163,6 +238,7 @@ DIMENSION_CONCEPTS: DimensionConcepts = {
                 "隔离",
                 "遏制",
                 "根因分析",
+                "复盘",
             ),
         },
         "threat_hunting": {

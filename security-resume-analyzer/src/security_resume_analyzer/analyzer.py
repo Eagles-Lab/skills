@@ -14,7 +14,7 @@ from pydantic import ValidationError
 
 from .errors import AnalyzerError, InputValidationError, OutputSafetyError
 from .matching import unsafe_offensive_statements
-from .models import DataQualityWarning, Resume, Track
+from .models import DataQualityWarning, Resume
 from .output import (
     derive_output_name,
     derive_resume_id,
@@ -88,14 +88,12 @@ class SecurityResumeAnalyzer:
     def __init__(
         self,
         output_dir: Path,
-        track: Track | str,
         *,
         clock: Clock = _utc_now,
         renderer: ReportRenderer | None = None,
     ) -> None:
         self.output_dir = Path(output_dir)
-        self.track = Track(track)
-        self.calculator = ScoreCalculator(self.track)
+        self.calculator = ScoreCalculator()
         self.clock = clock
         self.renderer = renderer or ReportRenderer()
 
@@ -155,7 +153,7 @@ class SecurityResumeAnalyzer:
                 "analyzer_version": ANALYZER_VERSION,
                 "analyzer_status": ANALYZER_STATUS,
                 "calibration_status": CALIBRATION_STATUS,
-                "target_track": self.track.value,
+                "scoring_profile": score["scoring_profile"],
                 "resume_id": resume_id,
                 "output_name": output_name,
                 "input_sha256": combined_sha256,

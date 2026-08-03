@@ -18,13 +18,8 @@ from .errors import (
     OutputSafetyError,
     PDFExtractionError,
 )
-from .models import Track
 from .output import write_private_directory_bundle
 from .pdf import PDFLimits, write_raw_extraction
-
-
-def _track(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--track", required=True, choices=[value.value for value in Track])
 
 
 def _positive(value: str) -> int:
@@ -45,13 +40,12 @@ def analyze_main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("--extracted", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
-    _track(parser)
     parser.add_argument("--include-contact", action="store_true")
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--seed")
     args = parser.parse_args(argv)
     try:
-        SecurityResumeAnalyzer(args.output_dir, args.track).analyze(
+        SecurityResumeAnalyzer(args.output_dir).analyze(
             args.extracted,
             include_contact=args.include_contact,
             overwrite=args.overwrite,
@@ -85,13 +79,12 @@ def batch_main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("--input-dir", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
-    _track(parser)
     parser.add_argument("--parallel", type=_positive, default=3)
     parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args(argv)
     try:
         summary = BatchProcessor(
-            args.output_dir, args.track, max_workers=args.parallel, overwrite=args.overwrite
+            args.output_dir, max_workers=args.parallel, overwrite=args.overwrite
         ).process_directory(args.input_dir)
     except InputValidationError as exc:
         _error("input error", exc)

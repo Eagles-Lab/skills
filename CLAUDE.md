@@ -55,9 +55,9 @@ calibration thresholds and both platform forward tests pass.
 ## Security Resume Analyzer
 
 For `security-resume-analyzer`, read its `SKILL.md`,
-`references/claude.md`, and the task-specific one-hop references. Require an
-explicit `appsec-offensive`, `defense-ir`, or
-`security-engineering-cloud` track; never infer one from the resume.
+`references/claude.md`, and the task-specific one-hop references. Use the
+single `cn-campus-security-general` profile; do not request, infer, or display
+a target job track.
 
 Use the document capability actually installed in the current environment to
 map PDF, DOCX, or Markdown to canonical security schema v1. The independent

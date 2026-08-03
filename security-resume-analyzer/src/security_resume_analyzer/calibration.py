@@ -10,13 +10,11 @@ from typing import Any
 
 from .analyzer import load_resume
 from .errors import InputValidationError
-from .models import Track
-from .scoring import DIMENSIONS, ScoreCalculator
+from .scoring import DIMENSION_WEIGHTS, DIMENSIONS, ScoreCalculator
 
 REQUIRED_COLUMNS = {
     "resume_id",
     "reviewer_id",
-    "track",
     *DIMENSIONS,
     "resume_quality",
     "overall_grade",
@@ -40,10 +38,7 @@ def evaluate(resumes_dir: Path, reviews_csv: Path) -> dict[str, Any]:
             raise InputValidationError(
                 f"resume_id {resume.resume_id} requires two independent reviewers"
             )
-        tracks = {row["track"] for row in review_rows}
-        if len(tracks) != 1:
-            raise InputValidationError(f"resume_id {resume.resume_id} has conflicting tracks")
-        scores[resume.resume_id] = ScoreCalculator(Track(tracks.pop())).calculate(resume)
+        scores[resume.resume_id] = ScoreCalculator().calculate(resume)
     if set(scores) != set(grouped):
         raise InputValidationError("reviews and canonical resume_id sets must match exactly")
     reviewer_totals: list[tuple[float, float]] = []
@@ -51,11 +46,9 @@ def evaluate(resumes_dir: Path, reviews_csv: Path) -> dict[str, Any]:
     grade_matches = 0
     dimension_errors: dict[str, list[float]] = {key: [] for key in DIMENSIONS}
     for resume_id, review_rows in sorted(grouped.items()):
-        track = Track(review_rows[0]["track"])
-        weights = ScoreCalculator(track).weights
         totals = []
         for row in review_rows:
-            total = sum(float(row[key]) * weights[key] for key in DIMENSIONS)
+            total = sum(float(row[key]) * DIMENSION_WEIGHTS[key] for key in DIMENSIONS)
             totals.append(total)
         reviewer_totals.append((totals[0], totals[1]))
         human = statistics.mean(totals)
@@ -137,7 +130,6 @@ def _read_reviews(path: Path) -> list[dict[str, str]]:
             f"calibration CSV could not be read: {type(exc).__name__}"
         ) from exc
     for row in rows:
-        Track(row["track"])
         for key in DIMENSIONS:
             value = float(row[key])
             if not 1.0 <= value <= 10.0:

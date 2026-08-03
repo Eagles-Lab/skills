@@ -9,7 +9,7 @@ import pytest
 from security_resume_analyzer.calibration import REQUIRED_COLUMNS, evaluate, render_markdown
 from security_resume_analyzer.cli import batch_main, calibrate_main, extract_main
 from security_resume_analyzer.errors import InputValidationError
-from security_resume_analyzer.models import Resume, Track
+from security_resume_analyzer.models import Resume
 from security_resume_analyzer.scoring import DIMENSIONS, ScoreCalculator
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -30,12 +30,11 @@ def _calibration_data(tmp_path: Path) -> tuple[Path, Path]:
         writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
         for resume in (empty, complete):
-            score = ScoreCalculator(Track.appsec_offensive).calculate(resume)
+            score = ScoreCalculator().calculate(resume)
             for reviewer in ("r1", "r2"):
                 row = {
                     "resume_id": resume.resume_id,
                     "reviewer_id": reviewer,
-                    "track": Track.appsec_offensive.value,
                     "resume_quality": score.resume_quality.score,
                     "overall_grade": score.grade.grade,
                     "notes": "independent review",
@@ -109,8 +108,6 @@ def test_batch_cli_rejects_missing_input(tmp_path: Path) -> None:
                 str(tmp_path / "missing"),
                 "--output-dir",
                 str(tmp_path / "out"),
-                "--track",
-                "defense-ir",
             ]
         )
         == 2
