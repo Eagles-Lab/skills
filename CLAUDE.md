@@ -70,3 +70,16 @@ authorization are capped, illegal claims do not score, and contacts are hidden
 by default. Version 1.0.0 is runtime-stable but remains
 `calibration_status: not_calibrated`; do not rank candidates or make hiring
 decisions from its output.
+
+## Development Resume Analyzer
+
+For campus software-development resumes, read
+`development-resume-analyzer/SKILL.md`, then
+`development-resume-analyzer/references/claude.md` and the task-specific direct
+reference. Use the document/PDF capability installed in the current Claude
+environment, create an untrusted raw extraction, map explicit facts to canonical
+v1, and run the shared deterministic Python CLI with the source audit enabled.
+
+The development analyzer uses one general profile and has no job-track option.
+Its interface is stable, but scoring remains `not_calibrated` and must not be
+used for ranking or hiring decisions.
