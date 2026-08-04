@@ -26,9 +26,12 @@ For DOCX and Markdown, use the platform's installed document reader and create
 the same tool-neutral raw interchange object. Do not embed an unavailable
 Claude or Codex pseudo-call in canonical data.
 
-Map only facts explicitly supported by the source. Use `null` or `[]` for
-ambiguous fields. Run `--raw-extraction` with single analysis, or store batch
-audits as `RAW_DIR/<canonical-stem>/raw_extraction.json` and pass
+Map only facts explicitly supported by the source. Preserve source wording for
+roles, durations, descriptions, achievements, and other score-bearing claims;
+the deterministic audit rejects paraphrases it cannot ground directly. Use
+`null` or `[]` for ambiguous fields. Run `--raw-extraction` with single
+analysis, or store batch audits as
+`RAW_DIR/<canonical-stem>/raw_extraction.json` and pass
 `--raw-extraction-dir RAW_DIR`.
 
 Keep raw extractions and canonical staging private and outside Git. Delete

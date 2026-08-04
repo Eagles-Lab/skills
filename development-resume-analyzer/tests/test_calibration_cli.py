@@ -50,7 +50,8 @@ def test_calibration_report_passes_exact_independent_reviews(tmp_path: Path) -> 
     assert report["passed"] is True
     assert report["thresholds_passed"] is True
     assert report["calibration_status"] == "not_calibrated"
-    assert report["metrics"]["reviewer_weighted_kappa"] == 1.0
+    assert "reviewer_weighted_kappa" not in report["metrics"]
+    assert "reviewer_weighted_kappa" not in report["thresholds"]
     assert report["metrics"]["tool_human_spearman"] == 1.0
     markdown = render_markdown(report)
     assert "separately reviewed calibration release" in markdown

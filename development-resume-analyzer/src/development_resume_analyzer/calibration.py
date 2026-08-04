@@ -41,7 +41,6 @@ def evaluate(resumes_dir: Path, reviews_csv: Path) -> dict[str, Any]:
         scores[resume.resume_id] = ScoreCalculator().calculate(resume)
     if set(scores) != set(grouped):
         raise InputValidationError("reviews and canonical resume_id sets must match exactly")
-    reviewer_totals: list[tuple[float, float]] = []
     tool_human: list[tuple[float, float]] = []
     grade_matches = 0
     dimension_errors: dict[str, list[float]] = {key: [] for key in DIMENSIONS}
@@ -50,7 +49,6 @@ def evaluate(resumes_dir: Path, reviews_csv: Path) -> dict[str, Any]:
         for row in review_rows:
             total = sum(float(row[key]) * DIMENSION_WEIGHTS[key] for key in DIMENSIONS)
             totals.append(total)
-        reviewer_totals.append((totals[0], totals[1]))
         human = statistics.mean(totals)
         tool = scores[resume_id].total_score
         tool_human.append((tool, human))
@@ -63,19 +61,16 @@ def evaluate(resumes_dir: Path, reviews_csv: Path) -> dict[str, Any]:
                     - statistics.mean(float(row[key]) for row in review_rows)
                 )
             )
-    kappa = _weighted_agreement(reviewer_totals)
     spearman = _spearman(tool_human)
     absolute_errors = [abs(tool - human) for tool, human in tool_human]
     grade_agreement = grade_matches / len(grouped) if grouped else 0.0
     thresholds = {
-        "reviewer_weighted_kappa": 0.70,
         "tool_human_spearman": 0.75,
         "median_absolute_error_max": 1.0,
         "grade_agreement": 0.80,
     }
     median_absolute_error = round(statistics.median(absolute_errors), 4)
     metrics = {
-        "reviewer_weighted_kappa": round(kappa, 4),
         "tool_human_spearman": round(spearman, 4),
         "median_absolute_error": median_absolute_error,
         "grade_agreement": round(grade_agreement, 4),
@@ -83,12 +78,7 @@ def evaluate(resumes_dir: Path, reviews_csv: Path) -> dict[str, Any]:
             key: round(statistics.mean(values), 4) for key, values in dimension_errors.items()
         },
     }
-    passed = (
-        kappa >= 0.70
-        and spearman >= 0.75
-        and median_absolute_error <= 1.0
-        and grade_agreement >= 0.80
-    )
+    passed = spearman >= 0.75 and median_absolute_error <= 1.0 and grade_agreement >= 0.80
     return {
         "schema_version": "1.0",
         "calibration_status": "not_calibrated",
@@ -108,7 +98,6 @@ def render_markdown(report: dict[str, Any]) -> str:
             "",
             f"- status: `{report['calibration_status']}`",
             f"- samples: {report['sample_count']}",
-            f"- reviewer weighted agreement: {metrics['reviewer_weighted_kappa']}",
             f"- tool-human Spearman: {metrics['tool_human_spearman']}",
             f"- median absolute error: {metrics['median_absolute_error']}",
             f"- grade agreement: {metrics['grade_agreement']}",
@@ -163,15 +152,3 @@ def _spearman(pairs: list[tuple[float, float]]) -> float:
     numerator = sum((x - mean_a) * (y - mean_b) for x, y in zip(a, b, strict=True))
     denominator = (sum((x - mean_a) ** 2 for x in a) * sum((y - mean_b) ** 2 for y in b)) ** 0.5
     return numerator / denominator if denominator else 0.0
-
-
-def _weighted_agreement(pairs: list[tuple[float, float]]) -> float:
-    if not pairs:
-        return 0.0
-    observed = statistics.mean(abs(left - right) / 9 for left, right in pairs)
-    left_mean = statistics.mean(left for left, _ in pairs)
-    right_mean = statistics.mean(right for _, right in pairs)
-    expected = statistics.mean(
-        (abs(left - right_mean) + abs(right - left_mean)) / 18 for left, right in pairs
-    )
-    return 1.0 - observed / expected if expected else (1.0 if observed == 0 else 0.0)

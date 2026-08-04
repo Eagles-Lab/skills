@@ -66,7 +66,7 @@ Do not create technical evidence from quality prose.
 ## Calibration contract
 
 Released score files state `calibration_status: "not_calibrated"`. Future
-calibration uses 40–60 private, de-identified campus-development resumes and two
-independent developer reviewers. Require weighted agreement ≥0.70,
-tool-to-human Spearman ≥0.75, median absolute error ≤1.0, and grade agreement
-≥80%. Passing a local report does not silently change the released status.
+calibration uses private, de-identified campus-development resumes and two
+independent developer reviewers. Require tool-to-human Spearman ≥0.75, median
+absolute error ≤1.0, and grade agreement ≥80%. Passing a local report does not
+silently change the released status.

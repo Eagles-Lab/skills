@@ -196,5 +196,55 @@ def test_rejects_ungrounded_experience_names_and_organization(tmp_path: Path) ->
     assert "canonical_technology_not_grounded" in message
 
 
+def test_rejects_ungrounded_score_claims_and_contact(tmp_path: Path) -> None:
+    raw = raw_extraction(
+        tmp_path / "raw_extraction.json",
+        "张三 示例大学 软件工程 本科 2027 项目经历 平台 使用 Python 完成开发",
+    )
+    resume = Resume.model_validate(
+        {
+            "basic_info": {
+                "name": "张三",
+                "school": "示例大学",
+                "major": "软件工程",
+                "degree": "本科",
+                "graduation_year": 2027,
+                "contact": {"email": "invented@example.test"},
+            },
+            "projects": [
+                {
+                    "name": "平台",
+                    "role": "项目负责人",
+                    "duration": "2025-2026",
+                    "description": "主导架构设计并完成测试上线，服务 10 万用户",
+                    "tech_stack": ["Python"],
+                    "achievements": ["吞吐提升 80%"],
+                }
+            ],
+        }
+    )
+    with pytest.raises(SourceMappingAuditError) as error:
+        audit_source_mapping(raw, resume)
+    message = str(error.value)
+    for code in (
+        "canonical_contact_email_not_grounded",
+        "canonical_experience_role_not_grounded",
+        "canonical_experience_duration_not_grounded",
+        "canonical_experience_description_not_grounded",
+        "canonical_experience_achievement_not_grounded",
+    ):
+        assert code in message
+
+
+def test_raw_hash_is_normalized_to_lowercase(tmp_path: Path) -> None:
+    raw = raw_extraction(tmp_path / "raw_extraction.json", "text")
+    data = json.loads(raw.read_text())
+    data["source_sha256"] = "A" * 64
+    raw.write_text(json.dumps(data), encoding="utf-8")
+    result = audit_source_mapping(raw, Resume())
+    assert result.raw_source_sha256 == "a" * 64
+    assert result.public_metadata()["audit_version"] == "1.1.0"
+
+
 def test_grounding_helper_rejects_blank() -> None:
     assert not _grounded(" ", "raw text")

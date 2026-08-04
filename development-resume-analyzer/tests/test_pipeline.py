@@ -104,6 +104,8 @@ def test_raw_source_mapping_audit_is_recorded(tmp_path: Path) -> None:
     score = json.loads(Path(paths["score"]).read_text())
     assert score["source_mapping_audits"][0]["passed"] is True
     assert score["source_mapping_audits"][0]["raw_source_sha256"] == "a" * 64
+    assert score["source_hashes"] == ["a" * 64]
+    assert score["deduplication"]["primary_sha256"] == "a" * 64
 
 
 def test_prompt_injection_does_not_change_workflow_or_leak(tmp_path: Path) -> None:
@@ -155,6 +157,31 @@ def test_batch_deduplicates_cross_format_canonical_sources(tmp_path: Path) -> No
     assert len(list((output / "resume_analysis").iterdir())) == 1
 
 
+def test_batch_uses_audited_raw_hash_for_source_identity(tmp_path: Path) -> None:
+    inputs = tmp_path / "inputs"
+    raw_root = tmp_path / "raw"
+    inputs.mkdir()
+    (raw_root / "candidate").mkdir(parents=True)
+    canonical = (FIXTURES / "complete.json").read_text()
+    (inputs / "candidate.json").write_text(canonical)
+    (raw_root / "candidate" / "raw_extraction.json").write_text(
+        json.dumps(
+            {
+                "content_trust": "untrusted",
+                "source_sha256": "b" * 64,
+                "full_text": canonical,
+            },
+            ensure_ascii=False,
+        )
+    )
+    output = tmp_path / "run"
+    summary = BatchProcessor(output, raw_extraction_dir=raw_root).process_directory(inputs)
+    assert summary["successful"] == 1
+    score = json.loads(next(output.glob("resume_analysis/*/score.json")).read_text())
+    assert score["source_hashes"] == ["b" * 64]
+    assert score["source_mapping_audits"][0]["raw_source_sha256"] == "b" * 64
+
+
 def test_batch_partial_failure_is_published(tmp_path: Path) -> None:
     inputs = tmp_path / "inputs"
     inputs.mkdir()
@@ -180,7 +207,7 @@ def test_batch_does_not_follow_input_symlink(tmp_path: Path) -> None:
     assert summary["results"][0]["error_category"] == "UnsafeInputEntry"
 
 
-def test_batch_merges_exact_duplicate_anonymous_canonical(tmp_path: Path) -> None:
+def test_batch_fails_exact_duplicate_anonymous_canonical(tmp_path: Path) -> None:
     inputs = tmp_path / "inputs"
     inputs.mkdir()
     for name in ("a.json", "b.json"):
@@ -188,8 +215,14 @@ def test_batch_merges_exact_duplicate_anonymous_canonical(tmp_path: Path) -> Non
     output = tmp_path / "run"
     summary = BatchProcessor(output).process_directory(inputs)
     assert summary["raw_file_count"] == 2
-    assert summary["unique_candidate_count"] == 1
-    assert summary["deduplicated_source_count"] == 1
+    assert summary["unique_candidate_count"] == 2
+    assert summary["deduplicated_source_count"] == 0
+    assert summary["successful"] == 0
+    assert summary["failed"] == 2
+    assert summary["conflict_failure_count"] == 2
+    assert all(
+        item.get("conflict_fields") == ["insufficient_identity"] for item in summary["results"]
+    )
 
 
 @pytest.mark.parametrize("workers", [1, 3, 16])

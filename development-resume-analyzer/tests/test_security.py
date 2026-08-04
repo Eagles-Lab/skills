@@ -36,13 +36,27 @@ def test_instruction_detection_is_specific_and_recursive():
 def test_report_sanitizer_omits_instructions_and_escapes_html():
     assert sanitize_report_text(INJECTION) == OMITTED_REPORT_TEXT
     assert sanitize_report_text("<script>alert(1)</script>") == (
-        "&lt;script&gt;alert(1)&lt;/script&gt;"
+        "&lt;script&gt;alert\\(1\\)&lt;/script&gt;"
     )
     contact = sanitize_report_text("联系 13800000000 或 candidate@example.com")
     assert contact.count(OMITTED_CONTACT_TEXT) == 2
     assert "13800000000" not in contact
     assert "candidate@example.com" not in contact
     assert sanitize_included_contact_text("candidate@example.com") == "candidate@example.com"
+
+
+def test_report_sanitizer_blocks_markdown_images_links_tables_and_newlines():
+    value = "name | ![probe](https://example.test/pixel)\n# injected"
+    sanitized = sanitize_report_text(value)
+    assert "\n" not in sanitized
+    assert "![probe](" not in sanitized
+    assert " | " not in sanitized
+    assert "\\!\\[probe\\]\\(https://example.test/pixel\\)" in sanitized
+    assert "\\|" in sanitized
+    assert "\\#" in sanitized
+    assert sanitize_included_contact_text("user_name@example.test\n![x](https://x.test)") == (
+        "user\\_name@example.test \\!\\[x\\]\\(https://x.test\\)"
+    )
 
 
 def test_instruction_like_resume_content_is_not_scored_or_repeated(tmp_path):

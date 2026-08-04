@@ -13,7 +13,7 @@ from .errors import SourceMappingAuditError
 from .matching import normalize_text, term_pattern
 from .models import Resume
 
-SOURCE_MAPPING_AUDIT_VERSION = "1.0.0"
+SOURCE_MAPPING_AUDIT_VERSION = "1.1.0"
 MAX_RAW_EXTRACTION_BYTES = 25 * 1024 * 1024
 
 _SHA256 = re.compile(r"^[a-fA-F0-9]{64}$")
@@ -42,14 +42,15 @@ _INSTITUTION = re.compile(r"[\u4e00-\u9fff]{2,24}(?:大学|学院|学校)")
 _DEGREE_POLLUTION = re.compile(r"本科|专科|学士|硕士|研究生|博士")
 _EMAIL = re.compile(r"(?<![\w.+-])[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}(?![\w.-])")
 _PHONE = re.compile(r"(?<!\d)1[3-9]\d{9}(?!\d)")
+_ALIAS_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("kubernetes", ("kubernetes", "k8s")),
+    ("golang", ("golang", "go")),
+    ("javascript", ("javascript", "js")),
+    ("typescript", ("typescript", "ts")),
+    ("postgresql", ("postgresql", "postgres")),
+)
 _SKILL_ALIASES: Mapping[str, tuple[str, ...]] = {
-    "kubernetes": ("kubernetes", "k8s"),
-    "k8s": ("k8s", "kubernetes"),
-    "golang": ("golang", "go"),
-    "go": ("go", "golang"),
-    "javascript": ("javascript", "js"),
-    "typescript": ("typescript", "ts"),
-    "postgresql": ("postgresql", "postgres"),
+    alias: aliases for _, aliases in _ALIAS_GROUPS for alias in aliases
 }
 
 
@@ -97,6 +98,14 @@ def _compact(value: str) -> str:
     return "".join(character for character in normalized if character.isalnum())
 
 
+def _claim_compact(value: str) -> str:
+    normalized = normalize_text(value)
+    for canonical, aliases in _ALIAS_GROUPS:
+        for alias in sorted(aliases, key=lambda item: (-len(item), item)):
+            normalized = term_pattern(alias).sub(canonical, normalized)
+    return _compact(normalized)
+
+
 def _grounded(value: str, raw_text: str, *, aliases: bool = False) -> bool:
     normalized = unicodedata.normalize("NFKC", value).strip()
     if not normalized:
@@ -112,6 +121,11 @@ def _grounded(value: str, raw_text: str, *, aliases: bool = False) -> bool:
         elif _compact(candidate) in _compact(raw_text):
             return True
     return False
+
+
+def _grounded_claim(value: str, raw_text: str) -> bool:
+    compact = _claim_compact(value)
+    return bool(compact) and compact in _claim_compact(raw_text)
 
 
 def _section_state(raw_text: str, pattern: re.Pattern[str]) -> str:
@@ -149,6 +163,11 @@ def _audit_basic_info(resume: Resume, raw_text: str, errors: set[str], warnings:
     elif _INSTITUTION.search(raw_text):
         warnings.add("raw_has_institution_but_canonical_school_missing")
     contact = basic.contact
+    if contact is not None:
+        for field in ("email", "phone"):
+            value = getattr(contact, field)
+            if value and not _grounded_claim(value, raw_text):
+                errors.add(f"canonical_contact_{field}_not_grounded")
     if _EMAIL.search(raw_text) and (contact is None or contact.email is None):
         warnings.add("raw_has_email_but_canonical_email_missing")
     if _PHONE.search(raw_text) and (contact is None or contact.phone is None):
@@ -171,6 +190,12 @@ def _audit_experiences(resume: Resume, raw_text: str, errors: set[str]) -> None:
             errors.add("canonical_experience_name_not_grounded")
         if record.organization and not _grounded(record.organization, raw_text):
             errors.add("canonical_experience_organization_not_grounded")
+        for field in ("role", "duration", "description"):
+            value = getattr(record, field)
+            if value and not _grounded_claim(value, raw_text):
+                errors.add(f"canonical_experience_{field}_not_grounded")
+        if any(not _grounded_claim(value, raw_text) for value in record.achievements):
+            errors.add("canonical_experience_achievement_not_grounded")
 
 
 def _audit_skills(resume: Resume, raw_text: str, errors: set[str]) -> None:
@@ -195,5 +220,6 @@ def audit_source_mapping(raw_extraction_path: Path, resume: Resume) -> SourceMap
             "source/canonical mapping audit failed: " + ", ".join(sorted(errors))
         )
     return SourceMappingAuditResult(
-        raw_source_sha256=str(raw["source_sha256"]), warning_codes=tuple(sorted(warnings))
+        raw_source_sha256=str(raw["source_sha256"]).lower(),
+        warning_codes=tuple(sorted(warnings)),
     )

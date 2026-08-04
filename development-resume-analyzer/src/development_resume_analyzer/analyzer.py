@@ -207,12 +207,14 @@ class DevelopmentResumeAnalyzer:
         raw_extraction_path: Path | None = None,
     ) -> dict[str, str]:
         resume = load_resume(extracted_path)
-        digest = sha256_file(extracted_path)
-        audits = (
-            (audit_source_mapping(raw_extraction_path, resume).public_metadata(),)
-            if raw_extraction_path is not None
-            else ()
-        )
+        audits: tuple[Mapping[str, Any], ...]
+        if raw_extraction_path is not None:
+            audit = audit_source_mapping(raw_extraction_path, resume)
+            digest = audit.raw_source_sha256
+            audits = (audit.public_metadata(),)
+        else:
+            digest = sha256_file(extracted_path)
+            audits = ()
         artifacts = self.build_artifacts(
             resume,
             (digest,),

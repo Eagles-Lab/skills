@@ -72,6 +72,13 @@ def test_name_alone_never_merges_and_different_contacts_block_fallback() -> None
     )
 
 
+def test_identical_sparse_canonical_requires_manual_confirmation() -> None:
+    merged, failures = merge_candidates([source("a", {}), source("a", {})])
+    assert merged == []
+    assert len(failures) == 2
+    assert all(error.fields == ("insufficient_identity",) for error in failures)
+
+
 def test_identity_plus_similarity_fallback_without_contacts() -> None:
     left = Resume.model_validate(person())
     right = Resume.model_validate(person(description="使用 Python 编写开发工具并测试"))

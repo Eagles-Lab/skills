@@ -103,6 +103,10 @@ Store technology names only when they are explicitly grounded in the source.
 Do not convert a job objective, course title, or generic self-description into
 completed project evidence.
 
+Keep roles, durations, descriptions, and achievements in source-grounded
+wording. Do not paraphrase score-bearing claims in ways that prevent a direct
+raw-text audit.
+
 ## Audit source grounding
 
 For every PDF, DOCX, or Markdown run, use a freshly generated raw extraction
@@ -115,10 +119,10 @@ uv run --frozen analyze-development-resume \
   --output-dir analysis-run
 ```
 
-The audit verifies explicit identity fields, experience names, organizations,
-technologies, populated source sections, and raw source SHA-256 metadata. Fix
-the mapping when it fails. Never omit `--raw-extraction` merely to bypass an
-audit failure.
+The audit verifies explicit identity and contact fields, all score-bearing
+experience facts, technologies, populated source sections, and raw source
+SHA-256 metadata. Fix the mapping when it fails. Never omit
+`--raw-extraction` merely to bypass an audit failure.
 
 Direct user-supplied canonical facts may omit the raw audit. Do not describe
 such a run as original-document verified.

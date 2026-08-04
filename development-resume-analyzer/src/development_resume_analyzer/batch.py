@@ -66,21 +66,23 @@ class BatchProcessor:
                     }
                 )
                 continue
-            digest = sha256_file(path)
+            canonical_digest = sha256_file(path)
             try:
                 resume = load_resume(path)
-                audit = (
-                    audit_source_mapping(
+                if self.raw_extraction_dir is not None:
+                    audit_result = audit_source_mapping(
                         self._raw_extraction_path(path.stem), resume
-                    ).public_metadata()
-                    if self.raw_extraction_dir is not None
-                    else None
-                )
-                sources.append(ResumeSource(path, digest, resume, audit))
+                    )
+                    audit = audit_result.public_metadata()
+                    source_digest = audit_result.raw_source_sha256
+                else:
+                    audit = None
+                    source_digest = canonical_digest
+                sources.append(ResumeSource(path, source_digest, resume, audit))
             except Exception as exc:
                 failures.append(
                     {
-                        "source_hashes": [digest],
+                        "source_hashes": [canonical_digest],
                         "status": "failed",
                         "error_category": type(exc).__name__,
                     }

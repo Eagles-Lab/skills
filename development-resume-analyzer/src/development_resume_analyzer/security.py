@@ -40,6 +40,8 @@ _SIGNAL_PATTERNS = (
 _CONTROL_CHARACTERS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 _EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 _MOBILE_PHONE = re.compile(r"(?<!\d)(?:\+?86[- ]?)?1[3-9]\d{9}(?!\d)")
+_MARKDOWN_META = re.compile(r"([\\`*_\[\]{}()#+!|>~-])")
+_CONTACT_SENTINEL = "CONTACTOMITTEDSENTINEL7C2A"
 OMITTED_CONTACT_TEXT = "[contact omitted]"
 
 
@@ -72,9 +74,9 @@ def sanitize_report_text(value: Any) -> str:
     if is_instruction_like(text):
         return OMITTED_REPORT_TEXT
     cleaned = _CONTROL_CHARACTERS.sub("", text)
-    cleaned = _EMAIL.sub(OMITTED_CONTACT_TEXT, cleaned)
-    cleaned = _MOBILE_PHONE.sub(OMITTED_CONTACT_TEXT, cleaned)
-    return html.escape(cleaned, quote=False)
+    cleaned = _EMAIL.sub(_CONTACT_SENTINEL, cleaned)
+    cleaned = _MOBILE_PHONE.sub(_CONTACT_SENTINEL, cleaned)
+    return _escape_markdown_text(cleaned).replace(_CONTACT_SENTINEL, OMITTED_CONTACT_TEXT)
 
 
 def sanitize_included_contact_text(value: Any) -> str:
@@ -83,10 +85,16 @@ def sanitize_included_contact_text(value: Any) -> str:
     text = str(value)
     if is_instruction_like(text):
         return OMITTED_REPORT_TEXT
-    return html.escape(_CONTROL_CHARACTERS.sub("", text), quote=False)
+    return _escape_markdown_text(_CONTROL_CHARACTERS.sub("", text))
 
 
 def sanitize_report_list(values: Any) -> list[str]:
     if not isinstance(values, Sequence) or isinstance(values, (str, bytes, bytearray)):
         return []
     return [sanitize_report_text(value) for value in values]
+
+
+def _escape_markdown_text(text: str) -> str:
+    single_line = re.sub(r"[\r\n]+", " ", text)
+    escaped_html = html.escape(single_line, quote=False)
+    return _MARKDOWN_META.sub(r"\\\1", escaped_html)

@@ -6,6 +6,7 @@ import hashlib
 import json
 import re
 import unicodedata
+from collections import Counter
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 from pathlib import Path
@@ -99,10 +100,7 @@ def merge_candidates(
         matches = [
             group
             for group in groups
-            if any(
-                source.sha256 == item.sha256 or same_candidate(source.resume, item.resume)
-                for item in group
-            )
+            if any(same_candidate(source.resume, item.resume) for item in group)
         ]
         if not matches:
             groups.append([source])
@@ -121,7 +119,17 @@ def merge_candidates(
             failures.append(IdentityConflictError((item.sha256 for item in group), conflicts))
             continue
         merged.append(_merge_group(group))
-    return sorted(merged, key=lambda item: item.output_name), failures
+
+    output_name_counts = Counter(item.output_name for item in merged)
+    unambiguous: list[MergedCandidate] = []
+    for candidate in merged:
+        if output_name_counts[candidate.output_name] > 1:
+            failures.append(
+                IdentityConflictError(candidate.source_hashes, ("insufficient_identity",))
+            )
+        else:
+            unambiguous.append(candidate)
+    return sorted(unambiguous, key=lambda item: item.output_name), failures
 
 
 def fact_coverage(resume: Resume) -> int:
