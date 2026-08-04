@@ -1,0 +1,590 @@
+{
+  "$defs": {
+    "BasicInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "contact": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Contact"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "degree": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Degree"
+        },
+        "graduation_year": {
+          "anyOf": [
+            {
+              "maximum": 2200,
+              "minimum": 1900,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Graduation Year"
+        },
+        "major": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Major"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "school": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "School"
+        }
+      },
+      "title": "BasicInfo",
+      "type": "object"
+    },
+    "Contact": {
+      "additionalProperties": false,
+      "properties": {
+        "email": {
+          "anyOf": [
+            {
+              "maxLength": 320,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Email"
+        },
+        "phone": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Phone"
+        }
+      },
+      "title": "Contact",
+      "type": "object"
+    },
+    "Internship": {
+      "additionalProperties": false,
+      "properties": {
+        "achievements": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Achievements",
+          "type": "array"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "maxLength": 20000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "duration": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "organization": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Organization"
+        },
+        "role": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Role"
+        },
+        "tech_stack": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Tech Stack",
+          "type": "array"
+        }
+      },
+      "title": "Internship",
+      "type": "object"
+    },
+    "Project": {
+      "additionalProperties": false,
+      "properties": {
+        "achievements": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Achievements",
+          "type": "array"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "maxLength": 20000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "duration": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "organization": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Organization"
+        },
+        "role": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Role"
+        },
+        "tech_stack": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Tech Stack",
+          "type": "array"
+        }
+      },
+      "title": "Project",
+      "type": "object"
+    },
+    "SecurityActivity": {
+      "additionalProperties": false,
+      "properties": {
+        "achievements": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Achievements",
+          "type": "array"
+        },
+        "category": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SecurityCategory"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "description": {
+          "anyOf": [
+            {
+              "maxLength": 20000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "duration": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration"
+        },
+        "environment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SecurityEnvironment"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "organization": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Organization"
+        },
+        "role": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Role"
+        },
+        "tech_stack": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Tech Stack",
+          "type": "array"
+        }
+      },
+      "title": "SecurityActivity",
+      "type": "object"
+    },
+    "SecurityCategory": {
+      "enum": [
+        "ctf",
+        "lab",
+        "vulnerability_disclosure",
+        "bug_bounty",
+        "authorized_testing",
+        "open_source",
+        "security_competition",
+        "certification",
+        "paper",
+        "other"
+      ],
+      "title": "SecurityCategory",
+      "type": "string"
+    },
+    "SecurityEnvironment": {
+      "enum": [
+        "lab",
+        "ctf",
+        "bug_bounty",
+        "authorized",
+        "production_defense",
+        "academic",
+        "open_source",
+        "unknown"
+      ],
+      "title": "SecurityEnvironment",
+      "type": "string"
+    },
+    "Skills": {
+      "additionalProperties": false,
+      "properties": {
+        "ai_security": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Ai Security",
+          "type": "array"
+        },
+        "appsec_offensive": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Appsec Offensive",
+          "type": "array"
+        },
+        "cloud_identity_data": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Cloud Identity Data",
+          "type": "array"
+        },
+        "defense_ir": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Defense Ir",
+          "type": "array"
+        },
+        "governance_standards": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Governance Standards",
+          "type": "array"
+        },
+        "programming_languages": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Programming Languages",
+          "type": "array"
+        },
+        "security_engineering_tools": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Security Engineering Tools",
+          "type": "array"
+        },
+        "systems_networking": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Systems Networking",
+          "type": "array"
+        }
+      },
+      "title": "Skills",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "basic_info": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BasicInfo"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "internships": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/Internship"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Internships"
+    },
+    "projects": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/Project"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Projects"
+    },
+    "resume_id": {
+      "anyOf": [
+        {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Resume Id"
+    },
+    "security_activities": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/SecurityActivity"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Security Activities"
+    },
+    "skills": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Skills"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "title": "Resume",
+  "type": "object"
+}

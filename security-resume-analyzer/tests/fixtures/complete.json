@@ -1,0 +1,67 @@
+{
+  "resume_id": "security-candidate-1",
+  "basic_info": {
+    "name": "安全同学",
+    "school": "示例大学",
+    "major": "网络空间安全",
+    "degree": "本科",
+    "graduation_year": 2027,
+    "contact": {"email": "candidate@example.test", "phone": "13800000000"}
+  },
+  "internships": [
+    {
+      "organization": "示例公司",
+      "name": "安全运营实习",
+      "role": "安全实习生",
+      "duration": "2026.01-2026.06",
+      "description": "负责生产安全日志分析与 SIEM 检测规则设计，按方法步骤验证误报并完成事件处置和恢复，规则覆盖 30 个服务。",
+      "tech_stack": ["Python", "Sigma", "ELK"],
+      "achievements": ["编写自动化日志解析工具和单元测试，处置时间降低 25%。"]
+    }
+  ],
+  "projects": [
+    {
+      "organization": "示例实验室",
+      "name": "云原生安全平台",
+      "role": "负责人",
+      "duration": "2025.09-2025.12",
+      "description": "负责设计 Kubernetes RBAC、密钥管理、SBOM 和依赖扫描流程，测试权限边界并验证回滚。",
+      "tech_stack": ["Go", "Kubernetes", "SBOM"],
+      "achievements": ["实现可运行 CLI 并用集成测试验证 20 个用例。"]
+    }
+  ],
+  "security_activities": [
+    {
+      "category": "bug_bounty",
+      "environment": "bug_bounty",
+      "organization": "公开漏洞赏金计划",
+      "name": "Web 漏洞研究",
+      "role": "研究员",
+      "duration": "2025",
+      "description": "在授权范围负责代码审计和渗透测试，按方法复现 SSRF PoC，验证影响并提出修复建议和回归测试。",
+      "tech_stack": ["Burp Suite", "Python"],
+      "achievements": ["真实漏洞披露 2 个并完成修复复测。"]
+    },
+    {
+      "category": "open_source",
+      "environment": "open_source",
+      "organization": "开源社区",
+      "name": "LLM 安全评测",
+      "role": "开发者",
+      "duration": "2026",
+      "description": "实现提示注入红队评测工作流，使用评测集、Agent 工具权限、沙箱隔离、人工确认、监控与降级验证 100 个样本。",
+      "tech_stack": ["Python", "LLM security"],
+      "achievements": ["发现 12 个失败用例并回滚高风险工具权限。"]
+    }
+  ],
+  "skills": {
+    "programming_languages": ["Python", "Go"],
+    "systems_networking": ["Linux", "TCP/IP", "TLS"],
+    "appsec_offensive": ["代码审计", "Burp Suite"],
+    "defense_ir": ["SIEM", "Sigma"],
+    "cloud_identity_data": ["Kubernetes", "IAM", "SBOM"],
+    "security_engineering_tools": ["Git", "CI/CD"],
+    "ai_security": ["Prompt Injection", "Agent Security"],
+    "governance_standards": ["NIST", "OWASP ASVS"]
+  }
+}
