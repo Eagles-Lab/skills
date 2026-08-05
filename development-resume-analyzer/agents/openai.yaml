@@ -1,0 +1,4 @@
+interface:
+  display_name: "Development Resume Analyzer"
+  short_description: "Analyze campus development resumes with evidence"
+  default_prompt: "Use $development-resume-analyzer to map and analyze this campus development resume with evidence-backed scoring."

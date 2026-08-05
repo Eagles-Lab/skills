@@ -1,0 +1,55 @@
+{
+  "resume_id": "development-candidate-1",
+  "basic_info": {
+    "name": "开发候选人",
+    "school": "示例大学",
+    "major": "计算机科学与技术",
+    "degree": "本科",
+    "graduation_year": 2027,
+    "contact": {
+      "phone": "13800000000",
+      "email": "candidate@example.test"
+    }
+  },
+  "internships": [
+    {
+      "organization": "示例科技",
+      "name": "交易服务开发",
+      "role": "后端开发实习生",
+      "duration": "2026.03-2026.07",
+      "description": "负责设计并实现 Go 后端服务和 REST API，使用 MySQL 事务与 Redis 缓存。通过日志、指标和压测定位根因，完成修复及回归测试后上线，生产环境接口延迟降低 35%，服务 2 万用户。",
+      "tech_stack": ["Go", "MySQL", "Redis", "Docker", "Prometheus"],
+      "achievements": ["编写单元测试并接入 GitHub Actions，代码覆盖率达到 85%。"]
+    }
+  ],
+  "projects": [
+    {
+      "category": "course_project",
+      "organization": "示例大学",
+      "name": "协同任务平台",
+      "role": "项目负责人",
+      "duration": "2025.09-2025.12",
+      "description": "主导设计 React 前端和 Spring Boot 服务端架构，定义接口契约、JWT 鉴权和数据库表结构。实现 WebSocket 实时协作与异常重试，使用集成测试验证并发布给 120 名用户。",
+      "tech_stack": ["React", "TypeScript", "Java", "Spring Boot", "PostgreSQL"],
+      "achievements": ["通过 profiler 和对照实验完成性能优化，吞吐提升 40%。"]
+    },
+    {
+      "category": "personal_project",
+      "name": "代码知识助手",
+      "role": "独立开发者",
+      "description": "独立实现 RAG 与 Agent 工具调用工作流，用于代码审查、测试生成和调试。建立 200 条评测集并人工审核结果，配置权限边界、沙箱、监控和降级，真实用户试用后准确率提升 20%。",
+      "tech_stack": ["Python", "LLM", "RAG", "Agent"],
+      "achievements": ["为 AI 生成代码增加单元测试、静态检查和人工确认。"]
+    }
+  ],
+  "skills": {
+    "programming_languages": ["Go", "Java", "Python", "TypeScript"],
+    "frontend_client_technologies": ["React"],
+    "backend_technologies": ["Spring Boot", "REST API"],
+    "frameworks_libraries": ["FastAPI"],
+    "databases_storage": ["MySQL", "PostgreSQL", "Redis"],
+    "testing_quality": ["pytest", "JUnit", "Ruff"],
+    "engineering_devops": ["Git", "GitHub Actions", "Docker", "Prometheus"],
+    "ai_tools": ["Cursor", "Claude Code"]
+  }
+}

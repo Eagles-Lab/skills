@@ -31,3 +31,14 @@ covering foundations, engineering, assessment, defense, cloud, and AI security.
 The runtime contract is stable, but scoring is not human-calibrated. Every
 result declares `calibration_status: not_calibrated` and must not be used for
 candidate ranking or hiring decisions.
+
+## Development Resume Analyzer
+
+[`development-resume-analyzer`](development-resume-analyzer/SKILL.md) is a
+stable-interface, deterministic analyzer for Chinese software-development
+internship and campus-hire resumes. It uses one general profile across frontend,
+backend, client, full-stack, and AI application development.
+
+The score is explicitly `not_calibrated`: it measures documented evidence
+coverage and must not be used for candidate ranking or hiring decisions. Raw
+PDF, DOCX, and Markdown workflows require source-to-canonical grounding audits.

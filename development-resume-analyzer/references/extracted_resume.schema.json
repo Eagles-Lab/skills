@@ -1,0 +1,461 @@
+{
+  "$defs": {
+    "BasicInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "contact": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Contact"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "degree": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Degree"
+        },
+        "graduation_year": {
+          "anyOf": [
+            {
+              "maximum": 2200,
+              "minimum": 1900,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Graduation Year"
+        },
+        "major": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Major"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "school": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "School"
+        }
+      },
+      "title": "BasicInfo",
+      "type": "object"
+    },
+    "Contact": {
+      "additionalProperties": false,
+      "properties": {
+        "email": {
+          "anyOf": [
+            {
+              "maxLength": 320,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Email"
+        },
+        "phone": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Phone"
+        }
+      },
+      "title": "Contact",
+      "type": "object"
+    },
+    "Internship": {
+      "additionalProperties": false,
+      "properties": {
+        "achievements": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Achievements",
+          "type": "array"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "maxLength": 20000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "duration": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "organization": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Organization"
+        },
+        "role": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Role"
+        },
+        "tech_stack": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Tech Stack",
+          "type": "array"
+        }
+      },
+      "title": "Internship",
+      "type": "object"
+    },
+    "Project": {
+      "additionalProperties": false,
+      "properties": {
+        "achievements": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Achievements",
+          "type": "array"
+        },
+        "category": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProjectCategory"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "description": {
+          "anyOf": [
+            {
+              "maxLength": 20000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "duration": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "organization": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Organization"
+        },
+        "role": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Role"
+        },
+        "tech_stack": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Tech Stack",
+          "type": "array"
+        }
+      },
+      "title": "Project",
+      "type": "object"
+    },
+    "ProjectCategory": {
+      "enum": [
+        "course_project",
+        "personal_project",
+        "open_source",
+        "competition",
+        "research",
+        "hackathon",
+        "internship_project",
+        "other"
+      ],
+      "title": "ProjectCategory",
+      "type": "string"
+    },
+    "Skills": {
+      "additionalProperties": false,
+      "properties": {
+        "ai_tools": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Ai Tools",
+          "type": "array"
+        },
+        "backend_technologies": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Backend Technologies",
+          "type": "array"
+        },
+        "databases_storage": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Databases Storage",
+          "type": "array"
+        },
+        "engineering_devops": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Engineering Devops",
+          "type": "array"
+        },
+        "frameworks_libraries": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Frameworks Libraries",
+          "type": "array"
+        },
+        "frontend_client_technologies": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Frontend Client Technologies",
+          "type": "array"
+        },
+        "programming_languages": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Programming Languages",
+          "type": "array"
+        },
+        "testing_quality": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Testing Quality",
+          "type": "array"
+        }
+      },
+      "title": "Skills",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "basic_info": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BasicInfo"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "internships": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/Internship"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Internships"
+    },
+    "projects": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/Project"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Projects"
+    },
+    "resume_id": {
+      "anyOf": [
+        {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Resume Id"
+    },
+    "skills": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Skills"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "title": "Resume",
+  "type": "object"
+}
