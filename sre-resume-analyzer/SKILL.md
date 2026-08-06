@@ -255,9 +255,12 @@ compatible. Do not rename its files or make the CLI depend on a model.
 
 Read [Local LLM guidance layer](references/local-guidance-layer.md). For every
 candidate, the current Codex/Claude reads the original evidence and the three
-JSON files, then creates candidate-isolated `suggestions.md` and
-`interview_questions.md` drafts. It must not edit facts, scores, evidence
-groups, hashes, timestamps, or calibration state.
+JSON files, then creates a candidate-isolated incremental `suggestions.md` plus
+an `interview_questions.md` draft. The suggestions draft contains only
+per-experience critique, rewrite examples, growth advice, and its evidence
+index; it must not repeat the deterministic overview, scores, grade, six
+dimensions, or quality diagnosis. Neither draft may edit facts, scores,
+evidence groups, hashes, timestamps, or calibration state.
 
 Write individualized observations, rewrite examples, growth advice, and ten
 interview questions with resolvable `[E]`, `[S]`, and optional `[R]` citations.
@@ -282,7 +285,9 @@ only that candidate. A candidate-set, path, symlink, deterministic-input, or
 atomic-publication error fails the complete publish.
 
 Verify `guidance_manifest.json`, both deterministic copies, final mode headers,
-file hashes, reference counts, and this enriched layout:
+file hashes, reference counts, and that final `suggestions.md` contains the
+unchanged deterministic report followed by `# 本地 LLM 个性化增强` and the
+validated increment. Verify this enriched layout:
 
 ```text
 COMPLETE_RUN/
@@ -298,10 +303,11 @@ COMPLETE_RUN/
 └── batch_summary.json
 ```
 
-The finalizer validates UTF-8, sizes, references, raw hashes and lines, exactly
-ten questions, privacy, instruction-like content, private permissions, and
-path safety before a sibling-staging rename. It never changes the deterministic
-JSON or score.
+The finalizer validates UTF-8, sizes, references, raw hashes and lines, exact
+increment headings, score restatement, exactly ten questions, privacy,
+instruction-like content, private permissions, and path safety before a
+sibling-staging rename. It never changes the deterministic JSON, score, or
+embedded deterministic report.
 
 ## Explain results responsibly
 

@@ -47,7 +47,13 @@ INSTRUCTION_RE = re.compile(
     r"开发者消息|执行(?:以下|这个|上述).{0,8}(?:命令|代码)|调用.{0,8}工具|"
     r"泄露.{0,8}(?:提示词|密钥|环境变量))"
 )
-REQUIRED_SUGGESTION_SECTIONS = ("总体诊断", "逐段经历点评", "改写示例", "成长建议")
+SCORE_RESTATEMENT_RE = re.compile(
+    r"(?i)(?:技术证据覆盖总分|整体证据覆盖等级|总分|维度(?:得分|评分)|证据分|"
+    r"质量(?:诊断)?分|诊断分)\s*(?:为|是|达到|[:：])?\s*"
+    r"(?:[0-9]+(?:\.[0-9]+)?(?:\s*/\s*10)?|[A-F](?:\+)?)"
+)
+REQUIRED_SUGGESTION_SECTIONS = ("逐段经历点评", "改写示例", "成长建议")
+LLM_ENHANCEMENT_HEADING = "# 本地 LLM 个性化增强"
 QUESTION_LABELS = ("主问题：", "针对性追问：", "核验要点：")
 FAILURE_CODES = {
     "contact_detected",
@@ -59,6 +65,7 @@ FAILURE_CODES = {
     "invalid_utf8",
     "missing_draft",
     "oversized_draft",
+    "score_restatement_detected",
 }
 
 
@@ -438,14 +445,12 @@ def _validate_suggestions(
 ) -> Mapping[str, int]:
     _reject_unsafe_draft(text, candidate)
     body, _, counts = _validate_citations(text, candidate, raw_index)
-    section_positions: list[int] = []
-    for heading in REQUIRED_SUGGESTION_SECTIONS:
-        matches = list(re.finditer(rf"(?m)^## {re.escape(heading)}\s*$", body))
-        if len(matches) != 1:
-            raise CandidateDraftError("invalid_structure")
-        section_positions.append(matches[0].start())
-    if section_positions != sorted(section_positions):
+    headings = re.findall(r"(?m)^(#{1,6})\s+(.+?)\s*$", body)
+    expected_headings = [("##", heading) for heading in REQUIRED_SUGGESTION_SECTIONS]
+    if headings != expected_headings:
         raise CandidateDraftError("invalid_structure")
+    if SCORE_RESTATEMENT_RE.search(body):
+        raise CandidateDraftError("score_restatement_detected")
     bullet_count = 0
     for line in body.splitlines():
         stripped = line.strip()
@@ -570,12 +575,46 @@ def _mkdir(path: Path) -> None:
     path.mkdir(mode=0o700, parents=False, exist_ok=False)
 
 
-def _mode_header(generator: str, fallback_reason: str | None) -> str:
+def _generator_label(generator: str) -> str:
+    return "Codex" if generator == "codex" else "Claude"
+
+
+def _suggestions_mode_header(generator: str, fallback_reason: str | None) -> str:
     if fallback_reason is None:
-        label = "Codex" if generator == "codex" else "Claude"
-        return f"> 生成模式：本地 {label} 个性化建议层；确定性评分未修改。\n\n"
+        return (
+            f"> 生成模式：本地 {_generator_label(generator)} 个性化增强；"
+            "确定性报告与评分未修改。\n\n"
+        )
     return (
-        f"> 生成模式：确定性模板回退（原因：`{fallback_reason}`）；未生成本地模型个性化内容。\n\n"
+        f"> 生成模式：确定性模板回退（原因：`{fallback_reason}`）；未生成本地模型个性化增强。\n\n"
+    )
+
+
+def _questions_mode_header(generator: str, fallback_reason: str | None) -> str:
+    if fallback_reason is None:
+        return (
+            f"> 生成模式：本地 {_generator_label(generator)} 个性化面试题；确定性评分未修改。\n\n"
+        )
+    return (
+        f"> 生成模式：确定性模板回退（原因：`{fallback_reason}`）；未生成本地模型个性化面试题。\n\n"
+    )
+
+
+def _merge_suggestions(deterministic: bytes, guidance: str, generator: str) -> bytes:
+    separator = (
+        b""
+        if deterministic.endswith(b"\n\n")
+        else b"\n"
+        if deterministic.endswith(b"\n")
+        else b"\n\n"
+    )
+    return (
+        _suggestions_mode_header(generator, None).encode()
+        + deterministic
+        + separator
+        + LLM_ENHANCEMENT_HEADING.encode()
+        + b"\n\n"
+        + guidance.encode()
     )
 
 
@@ -613,15 +652,23 @@ def _copy_candidate(
     deterministic_interview = deterministic_question_path.read_bytes()
     _write_bytes(destination / "deterministic_suggestions.md", deterministic_suggestions)
     _write_bytes(deterministic_questions / f"{candidate.output_name}.md", deterministic_interview)
-    header = _mode_header(generator, fallback_reason)
     if draft is None:
-        final_suggestions = header.encode() + deterministic_suggestions
-        final_questions = header.encode() + deterministic_interview
+        final_suggestions = (
+            _suggestions_mode_header(generator, fallback_reason).encode()
+            + deterministic_suggestions
+        )
+        final_questions = (
+            _questions_mode_header(generator, fallback_reason).encode() + deterministic_interview
+        )
         counts = {"extracted": 0, "score": 0, "raw": 0}
         mode = "deterministic_fallback"
     else:
-        final_suggestions = (header + draft.suggestions).encode()
-        final_questions = (header + draft.questions).encode()
+        final_suggestions = _merge_suggestions(
+            deterministic_suggestions,
+            draft.suggestions,
+            generator,
+        )
+        final_questions = (_questions_mode_header(generator, None) + draft.questions).encode()
         counts = dict(draft.citation_counts)
         mode = "llm"
     _write_bytes(destination / "suggestions.md", final_suggestions)

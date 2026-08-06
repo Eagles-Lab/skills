@@ -1,4 +1,4 @@
 interface:
   display_name: "Campus SRE Resume Analyzer"
-  short_description: "Campus SRE scoring with cited local guidance"
-  default_prompt: "Use $sre-resume-analyzer to map and score this campus SRE resume, generate locally grounded cited guidance and ten interview questions, then validate and atomically publish the private enriched run."
+  short_description: "Campus SRE report with cited local enhancement"
+  default_prompt: "Use $sre-resume-analyzer to map and score this campus SRE resume, append locally grounded cited guidance to the unchanged deterministic report, generate ten interview questions, then validate and atomically publish the private enriched run."

@@ -19,8 +19,10 @@ uv run --frozen analyze-resume \
 
 Read [the local guidance contract](local-guidance-layer.md). Use the current
 Claude context—not an external model API—to write private, evidence-cited
-candidate drafts. Do not change deterministic JSON, scores, source hashes, or
-facts. Validate and atomically publish them with:
+candidate drafts. The suggestions draft contains only the three-section
+increment; do not add a title, overall diagnosis, score, grade, six-dimension
+summary, or quality score. Do not change deterministic JSON, scores, source
+hashes, or facts. Validate and atomically publish them with:
 
 ```bash
 uv run --frozen python scripts/finalize_guidance.py \
@@ -37,6 +39,7 @@ deterministic fallback; never bypass validation.
 The Claude forward test must use a clean context, the updated Skill, and a
 de-identified raw sample without expected canonical or score output. Verify the
 same hashes, six dimension semantics, enriched layout, citations, manifest,
-permissions, default privacy, and ten-question structure as Codex. A missing
+permissions, default privacy, ten-question structure, and the unchanged
+deterministic report embedded before the enhancement as Codex. A missing
 platform document capability is an explicit experimental release blocker, not
 permission to invent a call.

@@ -1,4 +1,4 @@
 interface:
   display_name: "Development Resume Analyzer"
-  short_description: "Campus development scoring with cited local guidance"
-  default_prompt: "Use $development-resume-analyzer to map and score this campus development resume, generate locally grounded cited guidance and ten interview questions, then validate and atomically publish the private enriched run."
+  short_description: "Campus development report with cited local enhancement"
+  default_prompt: "Use $development-resume-analyzer to map and score this campus development resume, append locally grounded cited guidance to the unchanged deterministic report, generate ten interview questions, then validate and atomically publish the private enriched run."

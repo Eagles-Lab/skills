@@ -90,13 +90,7 @@ def _run(tmp_path: Path, names: tuple[str, ...] = ("候选人-aaaaaaaa",)) -> Pa
 
 
 def _valid_suggestions() -> str:
-    return """# 个性化建议
-
-## 总体诊断
-
-- 已展示一个可核验的平台项目，但结果证据仍偏弱。[E1] [S1]
-
-## 逐段经历点评
+    return """## 逐段经历点评
 
 - 项目描述给出了实现和验证动作，可继续补充个人责任边界。[E1]
 - 实习只说明参与交付，建议补充分工和验收方法。[E2] [S1]
@@ -206,7 +200,7 @@ def test_complete_llm_draft_preserves_deterministic_artifacts(tmp_path: Path) ->
     record = _candidate_record(manifest)
     assert record["mode"] == "llm"
     assert record["fallback_reason"] is None
-    assert record["citation_counts"] == {"extracted": 24, "score": 13, "raw": 0}
+    assert record["citation_counts"] == {"extracted": 23, "score": 12, "raw": 0}
     assert (output / f"resume_analysis/{name}/extracted.json").read_bytes() == before[
         f"resume_analysis/{name}/extracted.json"
     ]
@@ -223,7 +217,18 @@ def test_complete_llm_draft_preserves_deterministic_artifacts(tmp_path: Path) ->
         f"interview_questions/{name}.md"
     ]
     assert (output / "batch_summary.json").read_bytes() == before["batch_summary.json"]
-    assert "本地 Codex" in (output / f"resume_analysis/{name}/suggestions.md").read_text()
+    final_suggestions = (output / f"resume_analysis/{name}/suggestions.md").read_bytes()
+    deterministic_suggestions = before[f"resume_analysis/{name}/suggestions.md"]
+    assert final_suggestions.startswith(
+        "> 生成模式：本地 Codex 个性化增强；确定性报告与评分未修改。\n\n".encode()
+    )
+    assert final_suggestions.count(deterministic_suggestions) == 1
+    deterministic_end = final_suggestions.index(deterministic_suggestions) + len(
+        deterministic_suggestions
+    )
+    enhancement_start = final_suggestions.index(guidance.LLM_ENHANCEMENT_HEADING.encode())
+    assert enhancement_start > deterministic_end
+    assert final_suggestions.rstrip().endswith(b"score.json#/dimension_scores/foundation")
     assert stat.S_IMODE(output.stat().st_mode) == 0o700
     assert all(
         stat.S_IMODE(path.stat().st_mode) == (0o700 if path.is_dir() else 0o600)
@@ -246,6 +251,10 @@ def test_missing_drafts_fall_back_with_explicit_headers(tmp_path: Path) -> None:
     assert record["fallback_reason"] == "missing_draft"
     assert (
         "确定性模板回退" in (output / "resume_analysis/候选人-aaaaaaaa/suggestions.md").read_text()
+    )
+    assert (
+        guidance.LLM_ENHANCEMENT_HEADING
+        not in (output / "resume_analysis/候选人-aaaaaaaa/suggestions.md").read_text()
     )
     assert "确定性模板回退" in (output / "interview_questions/候选人-aaaaaaaa.md").read_text()
 
@@ -282,9 +291,9 @@ def test_invalid_draft_content_falls_back(tmp_path: Path, replacement: str, reas
     if replacement == "extracted.json#/projects/99":
         text = text.replace("extracted.json#/projects/0", replacement)
     elif replacement == "[E99]":
-        text = text.replace("已展示一个", "[E99] 已展示一个")
+        text = text.replace("项目描述给出了", "[E99] 项目描述给出了")
     else:
-        text = text.replace("可核验的平台项目", f"可核验的平台项目 {replacement}")
+        text = text.replace("个人责任边界", f"个人责任边界 {replacement}")
     _write(path, text)
 
     manifest = _finalize(run, tmp_path / "final", draft=draft)
@@ -379,18 +388,53 @@ def test_uncited_prose_and_out_of_order_sections_fall_back(tmp_path: Path) -> No
     name = "候选人-aaaaaaaa"
     draft = _drafts(tmp_path, (name,))
     path = draft / name / "suggestions.md"
-    _write(path, path.read_text().replace("## 总体诊断", "## 总体诊断\n\n未引用诊断"))
+    _write(
+        path,
+        path.read_text().replace("## 逐段经历点评", "## 逐段经历点评\n\n未引用诊断"),
+    )
     manifest = _finalize(run, tmp_path / "prose-output", draft=draft)
     assert _candidate_record(manifest)["fallback_reason"] == "invalid_structure"
 
-    text = (
-        _valid_suggestions()
-        .replace("## 总体诊断", "## 临时")
-        .replace("## 成长建议", "## 总体诊断\n\n- 诊断。[E1]\n\n## 成长建议")
+    text = _valid_suggestions().replace(
+        "## 改写示例",
+        "## 临时章节\n\n- 临时内容。[E1]\n\n## 改写示例",
     )
     _write(path, text)
     manifest = _finalize(run, tmp_path / "order-output", draft=draft)
     assert _candidate_record(manifest)["fallback_reason"] == "invalid_structure"
+
+
+def test_legacy_full_report_draft_falls_back(tmp_path: Path) -> None:
+    run = _run(tmp_path)
+    name = "候选人-aaaaaaaa"
+    draft = _drafts(tmp_path, (name,))
+    path = draft / name / "suggestions.md"
+    _write(
+        path,
+        "# 个性化建议\n\n## 总体诊断\n\n- 不应复述确定性报告。[S1]\n\n" + path.read_text(),
+    )
+
+    manifest = _finalize(run, tmp_path / "legacy-output", draft=draft)
+
+    assert _candidate_record(manifest)["fallback_reason"] == "invalid_structure"
+
+
+def test_score_restatement_falls_back_with_specific_reason(tmp_path: Path) -> None:
+    run = _run(tmp_path)
+    name = "候选人-aaaaaaaa"
+    draft = _drafts(tmp_path, (name,))
+    path = draft / name / "suggestions.md"
+    _write(
+        path,
+        path.read_text().replace(
+            "- 建议补做可复现的验证记录",
+            "- 技术证据覆盖总分：5.0/10。[S1]\n- 建议补做可复现的验证记录",
+        ),
+    )
+
+    manifest = _finalize(run, tmp_path / "score-output", draft=draft)
+
+    assert _candidate_record(manifest)["fallback_reason"] == "score_restatement_detected"
 
 
 def test_unexpected_candidate_and_symlink_fail_closed(tmp_path: Path) -> None:

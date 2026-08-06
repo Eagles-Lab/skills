@@ -14,8 +14,9 @@ Write Python output to `deterministic-run`, then read
 [the local guidance contract](local-guidance-layer.md). The current Codex
 instance writes evidence-cited drafts to
 `guidance-drafts/<output_name>/{suggestions.md,interview_questions.md}`. Do not
-change deterministic JSON, scores, authorization facts, or calibration state,
-and do not call a model API.
+add a title, overall diagnosis, score, grade, six-dimension summary, or quality
+score to the incremental suggestions draft. Do not change deterministic JSON,
+scores, authorization facts, or calibration state, and do not call a model API.
 
 Publish the complete result with:
 
@@ -30,5 +31,6 @@ uv run --frozen python scripts/finalize_guidance.py \
 For a forward-test, provide only this Skill and a deidentified raw document to
 a fresh agent. Do not provide expected canonical fields or expected scores.
 Verify the canonical schema, general scoring profile, individualized cited
-guidance, enriched layout, unchanged score JSON, privacy, manifest modes, and
-`not_calibrated` notice afterward.
+guidance, the deterministic report embedded unchanged before the enhancement,
+unchanged score JSON, privacy, manifest modes, and `not_calibrated` notice
+afterward.

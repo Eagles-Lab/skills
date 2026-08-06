@@ -10,8 +10,10 @@ scoring, rendering, and publication.
 
 Write that model-free output to `deterministic-run`. Then read
 [the local guidance contract](local-guidance-layer.md) and use the current
-Claude context to create private, evidence-cited drafts. Do not call another
-model API, request an API Key, modify scores, or invent facts. Publish through:
+Claude context to create private, evidence-cited drafts. The suggestions draft
+is only the three-section increment and must not repeat the overall diagnosis,
+scores, grade, six dimensions, or quality score. Do not call another model API,
+request an API Key, modify scores, or invent facts. Publish through:
 
 ```bash
 uv run --frozen python scripts/finalize_guidance.py \
@@ -28,5 +30,6 @@ when a fact or authorization scope is not reliable.
 For an isolated forward-test, give a fresh Claude context only this Skill and a
 deidentified raw document. Do not reveal expected fields or scores. Verify the
 canonical schema, general scoring profile, individualized citations, enriched
-output layout, unchanged score JSON, privacy, manifest modes, and calibration
+output layout, the deterministic report embedded unchanged before the
+enhancement, unchanged score JSON, privacy, manifest modes, and calibration
 notice.

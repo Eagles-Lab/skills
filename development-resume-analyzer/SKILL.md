@@ -235,10 +235,12 @@ a partial run.
 Read [Local LLM guidance layer](references/local-guidance-layer.md). The current
 Codex/Claude reads original evidence and the three JSON files, then creates
 private candidate drafts. It is the generator: do not call a model API, request
-an API Key, change deterministic files, or invent facts. Generate diagnosis,
-per-experience critique, grounded rewrites, growth advice, and exactly ten
-questions. Cite material statements with `[E]`, `[S]`, or optional `[R]`; use
-`【待补充：…】` for missing facts.
+an API Key, change deterministic files, or invent facts. The suggestions draft
+contains only per-experience critique, grounded rewrites, growth advice, and its
+evidence index; do not repeat the overview, scores, grade, six dimensions, or
+quality diagnosis. Generate exactly ten questions separately. Cite material
+statements with `[E]`, `[S]`, or optional `[R]`; use `【待补充：…】` for missing
+facts.
 
 Then run:
 
@@ -255,9 +257,11 @@ Use generator `claude` in Claude. Omit raw evidence only for direct canonical
 input and omit drafts for explicit all-candidate fallback. One invalid draft
 only falls back its candidate. Verify manifest modes/reasons, source hashes,
 reference counts, artifact SHA-256, deterministic copies, final Markdown, and
-`batch_summary.json`. The finalizer validates structure, evidence, privacy,
-permissions, and paths before atomic publication; deterministic JSON and an
-existing batch summary must remain byte-identical.
+`batch_summary.json`. Confirm final `suggestions.md` embeds the unchanged
+deterministic report before `# 本地 LLM 个性化增强`. The finalizer validates
+increment headings, score restatement, evidence, privacy, permissions, and paths
+before atomic publication; deterministic JSON and an existing batch summary
+must remain byte-identical.
 
 ## Report failures
 

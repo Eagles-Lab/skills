@@ -9,7 +9,7 @@
 
 1. 将 Python CLI 输出写入私有 `DETERMINISTIC_RUN`。
 2. 当前 Codex/Claude 只读每个候选人的原始材料、`extracted.json`、
-   `score.json` 和 `analysis.json`，生成私有草稿。
+   `score.json` 和 `analysis.json`，生成只含个性化增量的私有草稿。
 3. 运行 `scripts/finalize_guidance.py` 校验草稿并原子发布到新的
    `OUTPUT_DIR`。
 4. 读取 `guidance_manifest.json`；逐候选人确认 `llm` 或
@@ -38,21 +38,22 @@ DRAFT_DIR/
 软链接、路径穿越和额外文件。单个候选人的两个草稿任一缺失或校验失败时，
 finalizer 只回退该候选人，不改变其他候选人的结果。
 
-## `suggestions.md` 合同
+## 增量 `suggestions.md` 草稿合同
 
-必须依次包含以下二级标题：
+草稿不是完整报告。不得写一级标题、总体诊断、基本信息、总分、等级、六维表格
+或质量评分；不得复述或改写任何数值化分数。必须依次且仅包含以下二级标题：
 
 ```markdown
-## 总体诊断
 ## 逐段经历点评
 ## 改写示例
 ## 成长建议
 ## 证据索引
 ```
 
-正文的观察、诊断、改写和建议用项目符号表达，每条都必须在同一行包含至少
-一个 `[E1]`、`[S1]` 或 `[R1]` 引用。逐段点评要覆盖每一段项目或实习，
-指出已证明内容、证据缺口和可验证的改进方向。
+正文的点评、改写和建议用项目符号表达，每条都必须在同一行包含至少一个
+`[E1]`、`[S1]` 或 `[R1]` 引用。逐段点评要覆盖每一段项目、实习或安全活动，
+指出已证明内容、证据缺口和可验证的改进方向。分数和确定性诊断只由 Python 报告
+呈现；增量草稿可以引用低分或缺失证据组，但不能重写其数值。
 
 改写示例只能重组已有事实。缺失的指标、规模、个人职责或结果必须写成
 `【待补充：需要候选人确认的事实】`，不能用看似真实的占位数字。未来学习
@@ -83,7 +84,7 @@ finalizer 只回退该候选人，不改变其他候选人的结果。
 ## 证据索引
 
 - [E1] extracted.json#/projects/0
-- [S1] score.json#/dimension_scores/debugging_performance_problem_solving
+- [S1] score.json#/dimension_scores/troubleshooting
 - [R1] raw:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef#L12-L18
 ```
 
@@ -115,8 +116,10 @@ uv run --frozen python scripts/finalize_guidance.py \
 授权替换完整输出时才加 `--overwrite`。
 
 finalizer 会校验 UTF-8、大小、候选集合、JSON Pointer、原文哈希及行号、
-10 题结构、联系方式、指令式内容、软链接、路径和私有权限，然后在输出目录
-同级创建 staging 并通过 rename 发布。失败的草稿只留下脱敏原因码。
+10 题结构、联系方式、指令式内容、额外标题、分数复述、软链接、路径和私有
+权限，然后在输出目录同级创建 staging 并通过 rename 发布。失败的草稿只
+留下脱敏原因码；数值化复述总分、等级或维度分时使用
+`score_restatement_detected`。
 
 最终目录固定为：
 
@@ -135,8 +138,10 @@ OUTPUT_DIR/
 ```
 
 `deterministic_suggestions.md` 和 `deterministic_interview_questions/` 是 Python
-模板原件；`suggestions.md` 和 `interview_questions/` 是通过校验的个性化内容
-或显式回退内容。两类最终 Markdown 顶部都标明生成模式，禁止静默伪装。
+模板原件。LLM 成功时，最终 `suggestions.md` 由模式标识、未经改写的完整 Python
+报告、固定的 `# 本地 LLM 个性化增强` 标题、三段增量内容和末尾证据索引组成；
+`interview_questions/` 仍保存通过校验的个性化问题。失败时只输出带明确模式
+标识的确定性模板，不创建空增强章节，禁止静默伪装。
 
 `guidance_manifest.json` 只记录版本、总体状态、请求的生成器、LLM/回退数量、
 每个候选人的模式、脱敏原因码、来源哈希、引用计数和最终文件 SHA-256；不得

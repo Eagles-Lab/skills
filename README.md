@@ -13,7 +13,7 @@ and local-model guidance:
 
 ```text
 document -> agent mapping -> canonical JSON -> deterministic Python staging
-         -> current Codex/Claude guidance drafts -> offline validation -> enriched run
+         -> current Codex/Claude incremental drafts -> offline validation -> enriched run
 ```
 
 The current release candidate is `3.0.0-rc.2`. It rejects v2 input and must not
@@ -57,10 +57,12 @@ All three Python CLIs keep their original candidate contract:
 model API and do not need an API Key.
 
 When the complete Skill runs, the current Codex or Claude instance generates
-private drafts from the original evidence and deterministic JSON. The offline
-`scripts/finalize_guidance.py` in each Skill validates citations, raw hashes and
-line ranges, ten-question structure, privacy, instruction-like content, paths,
-symlinks, and permissions before atomically publishing an enriched run. It
-preserves the Python templates as `deterministic_suggestions.md` and
-`deterministic_interview_questions/`, records per-candidate modes in
-`guidance_manifest.json`, and never modifies scores.
+incremental guidance drafts from the original evidence and deterministic JSON.
+The offline `scripts/finalize_guidance.py` in each Skill validates citations,
+raw hashes and line ranges, score restatement, ten-question structure, privacy,
+instruction-like content, paths, symlinks, and permissions before atomically
+publishing an enriched run. Final `suggestions.md` embeds the unchanged Python
+report and appends the validated local-model enhancement; the Python originals
+also remain available as `deterministic_suggestions.md` and
+`deterministic_interview_questions/`. The manifest records per-candidate modes,
+and the finalizer never modifies scores.

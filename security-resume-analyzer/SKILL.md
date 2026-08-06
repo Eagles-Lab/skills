@@ -265,12 +265,15 @@ contract. The CLI remains deterministic and does not call a model.
 
 Read [Local LLM guidance layer](references/local-guidance-layer.md). The current
 Codex/Claude reads the original evidence plus `extracted.json`, `score.json`,
-and `analysis.json`, and writes private per-candidate drafts. It may explain
-evidence and propose rewrites, growth work, and interview verification, but it
-must not change a fact, score, evidence group, source hash, or calibration state.
+and `analysis.json`, and writes private per-candidate drafts. The suggestions
+draft is only an increment containing per-experience critique, rewrite examples,
+growth work, and its evidence index. It must not repeat the deterministic
+overview, scores, grade, six dimensions, or quality diagnosis, and neither
+draft may change a fact, score, evidence group, source hash, or calibration
+state.
 
-Every observation, diagnosis, rewrite, suggestion, main question, follow-up,
-and verification point needs a resolvable citation. Missing claims use
+Every critique, rewrite, suggestion, main question, follow-up, and verification
+point needs a resolvable citation. Missing claims use
 `【待补充：…】`; never invent authorization, vulnerability impact, remediation,
 production scope, or results. Do not call a model API or request an API Key.
 
@@ -307,9 +310,11 @@ COMPLETE_RUN/
 ```
 
 The offline finalizer validates candidate membership, UTF-8, size, references,
-raw hashes/lines when present, exactly ten questions, contacts, instruction-like
-content, symlinks, paths, and permissions before atomic publication. Confirm
-the three deterministic JSON files and batch summary remain byte-identical.
+exact increment headings, score restatement, raw hashes/lines when present,
+exactly ten questions, contacts, instruction-like content, symlinks, paths, and
+permissions before atomic publication. Confirm final `suggestions.md` embeds
+the unchanged deterministic report before `# 本地 LLM 个性化增强`, and that the
+three deterministic JSON files and batch summary remain byte-identical.
 
 ## Calibration
 

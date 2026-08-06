@@ -7,8 +7,9 @@ The Agent maps explicit facts from PDF, DOCX, Markdown, or user-supplied content
 to canonical v3 JSON. Python only validates canonical JSON, scores it
 deterministically with profile `cn-campus-sre`, renders reports, and atomically
 publishes a model-free staging run. For the complete Skill, the current local
-Codex/Claude generates cited guidance drafts and the offline finalizer validates
-and atomically publishes them. No model API or additional API Key is used.
+Codex/Claude generates cited guidance increments and the offline finalizer
+validates them, appends them to the unchanged deterministic report, and
+atomically publishes the result. No model API or additional API Key is used.
 
 ## Environment
 
@@ -84,8 +85,10 @@ come from deterministic templates and remain available without a model.
 
 Read [local-guidance-layer.md](references/local-guidance-layer.md). After the
 deterministic run, the current Codex or Claude produces private per-candidate
-drafts with citations to canonical facts, scores, and optionally raw source
-lines. It must not change JSON, scores, or invent experience.
+incremental drafts with citations to canonical facts, scores, and optionally
+raw source lines. The suggestions draft contains only per-experience critique,
+rewrite examples, growth advice, and its evidence index. It must not repeat the
+deterministic overview or scores, change JSON, or invent experience.
 
 Publish with:
 
@@ -99,10 +102,12 @@ uv run --frozen python scripts/finalize_guidance.py \
 ```
 
 The finalizer is offline. It validates candidate membership, UTF-8, file size,
-JSON Pointer and raw-line citations, exactly ten interview questions, contact
-leakage, instruction-like content, symlinks, permissions, and paths. A single
-invalid draft uses a visibly marked deterministic fallback without changing
-that candidate's score.
+JSON Pointer and raw-line citations, exact increment headings, score
+restatement, exactly ten interview questions, contact leakage, instruction-like
+content, symlinks, permissions, and paths. On success, final `suggestions.md`
+embeds the unchanged deterministic report and appends `# 本地 LLM 个性化增强`.
+A single invalid draft uses a visibly marked deterministic fallback without
+changing that candidate's score.
 
 ```text
 COMPLETE_RUN/
