@@ -284,10 +284,12 @@ explicit all-candidate fallback. A bad or missing candidate draft falls back
 only that candidate. A candidate-set, path, symlink, deterministic-input, or
 atomic-publication error fails the complete publish.
 
-Verify `guidance_manifest.json`, both deterministic copies, final mode headers,
-file hashes, reference counts, and that final `suggestions.md` contains the
-unchanged deterministic report followed by `# 本地 LLM 个性化增强` and the
-validated increment. Verify this enriched layout:
+Verify `guidance_manifest.json`, source and final file hashes, reference counts,
+and that the final, unified `suggestions.md` contains the deterministic report
+body followed by `## 个性化建议增强`, the validated increment, and the original
+report-version footer as the final line. Successful Markdown must not expose the
+generator or a mode banner; read those details from the manifest. Verify this
+enriched layout:
 
 ```text
 COMPLETE_RUN/
@@ -295,9 +297,7 @@ COMPLETE_RUN/
 │   ├── extracted.json
 │   ├── score.json
 │   ├── analysis.json
-│   ├── deterministic_suggestions.md
 │   └── suggestions.md
-├── deterministic_interview_questions/<candidate>.md
 ├── interview_questions/<candidate>.md
 ├── guidance_manifest.json
 └── batch_summary.json
@@ -307,7 +307,10 @@ The finalizer validates UTF-8, sizes, references, raw hashes and lines, exact
 increment headings, score restatement, exactly ten questions, privacy,
 instruction-like content, private permissions, and path safety before a
 sibling-staging rename. It never changes the deterministic JSON, score, or
-embedded deterministic report.
+deterministic report content. Deterministic Markdown remains in the private
+staging run; the final manifest preserves its SHA-256 instead of publishing a
+second human-readable copy. Candidate fallback adds a subtle note, omits the
+empty enhancement section, and leaves the report version at the end.
 
 ## Explain results responsibly
 

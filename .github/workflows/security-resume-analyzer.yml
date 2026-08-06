@@ -110,16 +110,15 @@ jobs:
             --draft-dir "$wheel_root/drafts" \
             --output-dir "$wheel_root/enriched" \
             --generator codex
-          test "$(find "$wheel_root/enriched/resume_analysis" -type f | wc -l)" -eq 5
-          test "$(find "$wheel_root/enriched/deterministic_interview_questions" -type f -name '*.md' | wc -l)" -eq 1
+          test "$(find "$wheel_root/enriched/resume_analysis" -type f | wc -l)" -eq 4
+          test ! -e "$wheel_root/enriched/deterministic_interview_questions"
           test -f "$wheel_root/enriched/guidance_manifest.json"
           uv run --frozen python -c 'import json,sys; value=json.load(open(sys.argv[1])); assert value["counts"] == {"total": 1, "llm": 1, "fallback": 0}' "$wheel_root/enriched/guidance_manifest.json"
           candidate_dir="$(find "$wheel_root/output/resume_analysis" -mindepth 1 -maxdepth 1 -type d -print -quit)"
           candidate_name="$(basename "$candidate_dir")"
-          deterministic="$wheel_root/enriched/resume_analysis/$candidate_name/deterministic_suggestions.md"
+          deterministic="$candidate_dir/suggestions.md"
           final="$wheel_root/enriched/resume_analysis/$candidate_name/suggestions.md"
-          cmp "$candidate_dir/suggestions.md" "$deterministic"
-          uv run --frozen python -c 'import sys; deterministic=open(sys.argv[1],"rb").read(); final=open(sys.argv[2],"rb").read(); heading="# 本地 LLM 个性化增强".encode(); assert final.count(deterministic) == 1; assert final.index(heading) > final.index(deterministic) + len(deterministic)' "$deterministic" "$final"
+          uv run --frozen python -c 'import sys; source=open(sys.argv[1],encoding="utf-8").read(); final=open(sys.argv[2],encoding="utf-8").read(); marker="\n\n---\n\n报告版本："; split=source.rfind(marker); assert split >= 0; body=source[:split]; footer=source[split + 2:]; heading="## 个性化建议增强"; assert final.startswith(body); assert final.index(heading) > len(body); assert final.rstrip().endswith(footer.rstrip()); assert "生成模式" not in final and "本地 LLM" not in final' "$deterministic" "$final"
 
   skill-surface:
     name: Skill metadata and links

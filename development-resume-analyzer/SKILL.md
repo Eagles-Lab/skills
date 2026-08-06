@@ -256,12 +256,15 @@ uv run --frozen python scripts/finalize_guidance.py \
 Use generator `claude` in Claude. Omit raw evidence only for direct canonical
 input and omit drafts for explicit all-candidate fallback. One invalid draft
 only falls back its candidate. Verify manifest modes/reasons, source hashes,
-reference counts, artifact SHA-256, deterministic copies, final Markdown, and
-`batch_summary.json`. Confirm final `suggestions.md` embeds the unchanged
-deterministic report before `# 本地 LLM 个性化增强`. The finalizer validates
-increment headings, score restatement, evidence, privacy, permissions, and paths
-before atomic publication; deterministic JSON and an existing batch summary
-must remain byte-identical.
+reference counts, artifact SHA-256, final Markdown, and `batch_summary.json`.
+Confirm the single final `suggestions.md` keeps the deterministic report body,
+appends `## 个性化建议增强`, and places the original report-version footer at
+the very end. Successful Markdown must not display the generator or a mode
+banner. The finalizer validates increment headings, score restatement,
+evidence, privacy, permissions, and paths before atomic publication;
+deterministic JSON and an existing batch summary remain byte-identical.
+Deterministic Markdown stays in private staging and is represented by source
+hashes in the manifest rather than duplicate published files.
 
 ## Report failures
 

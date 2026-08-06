@@ -53,7 +53,10 @@ SCORE_RESTATEMENT_RE = re.compile(
     r"(?:[0-9]+(?:\.[0-9]+)?(?:\s*/\s*10)?|[A-F](?:\+)?)"
 )
 REQUIRED_SUGGESTION_SECTIONS = ("逐段经历点评", "改写示例", "成长建议")
-LLM_ENHANCEMENT_HEADING = "# 本地 LLM 个性化增强"
+PERSONALIZED_ENHANCEMENT_HEADING = "## 个性化建议增强"
+REPORT_FOOTER_RE = re.compile(
+    rb"(?:\r?\n){2}(?P<footer>---\r?\n\r?\n" + "报告版本：".encode() + rb"[^\r\n]+(?:\r?\n)?)\Z"
+)
 QUESTION_LABELS = ("主问题：", "针对性追问：", "核验要点：")
 FAILURE_CODES = {
     "contact_detected",
@@ -446,7 +449,7 @@ def _validate_suggestions(
     _reject_unsafe_draft(text, candidate)
     body, _, counts = _validate_citations(text, candidate, raw_index)
     headings = re.findall(r"(?m)^(#{1,6})\s+(.+?)\s*$", body)
-    expected_headings = [("##", heading) for heading in REQUIRED_SUGGESTION_SECTIONS]
+    expected_headings = [("###", heading) for heading in REQUIRED_SUGGESTION_SECTIONS]
     if headings != expected_headings:
         raise CandidateDraftError("invalid_structure")
     if SCORE_RESTATEMENT_RE.search(body):
@@ -575,47 +578,31 @@ def _mkdir(path: Path) -> None:
     path.mkdir(mode=0o700, parents=False, exist_ok=False)
 
 
-def _generator_label(generator: str) -> str:
-    return "Codex" if generator == "codex" else "Claude"
+def _split_report_footer(deterministic: bytes) -> tuple[bytes, bytes]:
+    match = REPORT_FOOTER_RE.search(deterministic)
+    if match is None:
+        return deterministic, b""
+    return deterministic[: match.start()], match.group("footer")
 
 
-def _suggestions_mode_header(generator: str, fallback_reason: str | None) -> str:
-    if fallback_reason is None:
-        return (
-            f"> 生成模式：本地 {_generator_label(generator)} 个性化增强；"
-            "确定性报告与评分未修改。\n\n"
-        )
-    return (
-        f"> 生成模式：确定性模板回退（原因：`{fallback_reason}`）；未生成本地模型个性化增强。\n\n"
-    )
+def _join_report_parts(*parts: bytes) -> bytes:
+    populated = [part.strip(b"\r\n") for part in parts if part.strip(b"\r\n")]
+    return b"\n\n".join(populated) + b"\n"
 
 
-def _questions_mode_header(generator: str, fallback_reason: str | None) -> str:
-    if fallback_reason is None:
-        return (
-            f"> 生成模式：本地 {_generator_label(generator)} 个性化面试题；确定性评分未修改。\n\n"
-        )
-    return (
-        f"> 生成模式：确定性模板回退（原因：`{fallback_reason}`）；未生成本地模型个性化面试题。\n\n"
-    )
+def _fallback_note(kind: str, reason: str) -> bytes:
+    return (f"> 注：个性化{kind}未生成，当前内容仅包含确定性结果（原因：`{reason}`）。").encode()
 
 
-def _merge_suggestions(deterministic: bytes, guidance: str, generator: str) -> bytes:
-    separator = (
-        b""
-        if deterministic.endswith(b"\n\n")
-        else b"\n"
-        if deterministic.endswith(b"\n")
-        else b"\n\n"
-    )
-    return (
-        _suggestions_mode_header(generator, None).encode()
-        + deterministic
-        + separator
-        + LLM_ENHANCEMENT_HEADING.encode()
-        + b"\n\n"
-        + guidance.encode()
-    )
+def _merge_suggestions(deterministic: bytes, guidance: str) -> bytes:
+    report, footer = _split_report_footer(deterministic)
+    enhancement = PERSONALIZED_ENHANCEMENT_HEADING.encode() + b"\n\n" + guidance.encode()
+    return _join_report_parts(report, enhancement, footer)
+
+
+def _fallback_suggestions(deterministic: bytes, reason: str) -> bytes:
+    report, footer = _split_report_footer(deterministic)
+    return _join_report_parts(report, _fallback_note("建议增强", reason), footer)
 
 
 def _single_summary() -> bytes:
@@ -635,11 +622,9 @@ def _copy_candidate(
     deterministic_run: Path,
     candidate: CandidateInput,
     draft: ValidatedDraft | None,
-    generator: str,
     fallback_reason: str | None,
 ) -> Mapping[str, Any]:
     analyses = staging / "resume_analysis"
-    deterministic_questions = staging / "deterministic_interview_questions"
     questions = staging / "interview_questions"
     destination = analyses / candidate.output_name
     _mkdir(destination)
@@ -650,25 +635,18 @@ def _copy_candidate(
         deterministic_run / "interview_questions" / f"{candidate.output_name}.md"
     )
     deterministic_interview = deterministic_question_path.read_bytes()
-    _write_bytes(destination / "deterministic_suggestions.md", deterministic_suggestions)
-    _write_bytes(deterministic_questions / f"{candidate.output_name}.md", deterministic_interview)
     if draft is None:
-        final_suggestions = (
-            _suggestions_mode_header(generator, fallback_reason).encode()
-            + deterministic_suggestions
-        )
+        if fallback_reason is None:
+            raise FinalizationError("candidate fallback has no reason")
+        final_suggestions = _fallback_suggestions(deterministic_suggestions, fallback_reason)
         final_questions = (
-            _questions_mode_header(generator, fallback_reason).encode() + deterministic_interview
+            _fallback_note("面试题", fallback_reason) + b"\n\n" + deterministic_interview
         )
         counts = {"extracted": 0, "score": 0, "raw": 0}
         mode = "deterministic_fallback"
     else:
-        final_suggestions = _merge_suggestions(
-            deterministic_suggestions,
-            draft.suggestions,
-            generator,
-        )
-        final_questions = (_questions_mode_header(generator, None) + draft.questions).encode()
+        final_suggestions = _merge_suggestions(deterministic_suggestions, draft.suggestions)
+        final_questions = draft.questions.encode()
         counts = dict(draft.citation_counts)
         mode = "llm"
     _write_bytes(destination / "suggestions.md", final_suggestions)
@@ -702,11 +680,7 @@ def _build_staging(
     generator: str,
     summary_bytes: bytes | None,
 ) -> Mapping[str, Any]:
-    for dirname in (
-        "resume_analysis",
-        "deterministic_interview_questions",
-        "interview_questions",
-    ):
+    for dirname in ("resume_analysis", "interview_questions"):
         _mkdir(staging / dirname)
     records: list[Mapping[str, Any]] = []
     llm_count = 0
@@ -732,7 +706,6 @@ def _build_staging(
                 deterministic_run,
                 candidate,
                 draft,
-                generator,
                 reason,
             )
         )

@@ -10,14 +10,16 @@
    `deterministic-run`.
 6. Read [the local guidance contract](local-guidance-layer.md). As the current
    Codex instance, write private evidence-cited drafts under
-   `guidance-drafts/<output_name>/`. Keep `suggestions.md` to the three-section
-   increment; do not add a title, overview, score, grade, dimensions, or quality
-   score, and do not call another model API.
+   `guidance-drafts/<output_name>/`. Keep `suggestions.md` to the three-subsection
+   increment with the required level-three headings; do not add a title,
+   overview, score, grade, dimensions, or quality score, and do not call another
+   model API.
 7. Run `scripts/finalize_guidance.py` with generator `codex`, the deterministic
    run, drafts, final output, and raw-extraction directory.
-8. Verify source audit, unchanged score JSON, the deterministic report embedded
-   unchanged before the enhancement, individualized citations, ten structured
-   questions, manifest modes, permissions, and contact omission.
+8. Verify source audit, unchanged score JSON, one unified suggestions report
+   with its version footer last, individualized citations, ten structured
+   questions, no visible success generator banner, manifest modes, permissions,
+   and contact omission.
 
 Do not send raw resume facts to unrelated tools or include candidate names in
 status commentary.

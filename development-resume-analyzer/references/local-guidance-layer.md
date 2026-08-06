@@ -41,13 +41,13 @@ finalizer 只回退该候选人，不改变其他候选人的结果。
 ## 增量 `suggestions.md` 草稿合同
 
 草稿不是完整报告。不得写一级标题、总体诊断、基本信息、总分、等级、六维表格
-或质量评分；不得复述或改写任何数值化分数。必须依次且仅包含以下二级标题：
+或质量评分；不得复述或改写任何数值化分数。必须依次且仅包含以下三级标题：
 
 ```markdown
-## 逐段经历点评
-## 改写示例
-## 成长建议
-## 证据索引
+### 逐段经历点评
+### 改写示例
+### 成长建议
+### 证据索引
 ```
 
 正文的点评、改写和建议用项目符号表达，每条都必须在同一行包含至少一个
@@ -81,7 +81,7 @@ finalizer 只回退该候选人，不改变其他候选人的结果。
 正文只写短标记，文件末尾的“证据索引”逐条解析：
 
 ```markdown
-## 证据索引
+### 证据索引
 
 - [E1] extracted.json#/projects/0
 - [S1] score.json#/dimension_scores/troubleshooting
@@ -129,19 +129,22 @@ OUTPUT_DIR/
 │   ├── extracted.json
 │   ├── score.json
 │   ├── analysis.json
-│   ├── deterministic_suggestions.md
 │   └── suggestions.md
-├── deterministic_interview_questions/<candidate>.md
 ├── interview_questions/<candidate>.md
 ├── guidance_manifest.json
 └── batch_summary.json
 ```
 
-`deterministic_suggestions.md` 和 `deterministic_interview_questions/` 是 Python
-模板原件。LLM 成功时，最终 `suggestions.md` 由模式标识、未经改写的完整 Python
-报告、固定的 `# 本地 LLM 个性化增强` 标题、三段增量内容和末尾证据索引组成；
-`interview_questions/` 仍保存通过校验的个性化问题。失败时只输出带明确模式
-标识的确定性模板，不创建空增强章节，禁止静默伪装。
+Python 原件只保留在私有确定性 staging，不复制到最终目录。模型草稿通过校验时，
+最终唯一的 `suggestions.md` 保留完整确定性报告主体，在其后追加固定的
+`## 个性化建议增强` 标题和三级增量章节，并把原报告版本信息移动到文件末尾。
+报告正文不显示 Codex、Claude、LLM 或成功模式标识；生成器和模式只记录在
+`guidance_manifest.json`。`interview_questions/` 保存通过校验的个性化问题，
+也不显示成功模式标识。
+
+候选人回退时，`suggestions.md` 和面试题只增加一条低显著度说明并保留确定性
+内容；`suggestions.md` 不创建空的增强章节，报告版本仍位于文件末尾。确定性
+来源报告和面试题的 SHA-256 继续写入 manifest，用于审计而不是额外发布副本。
 
 `guidance_manifest.json` 只记录版本、总体状态、请求的生成器、LLM/回退数量、
 每个候选人的模式、脱敏原因码、来源哈希、引用计数和最终文件 SHA-256；不得

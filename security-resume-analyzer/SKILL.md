@@ -290,8 +290,8 @@ uv run --frozen python scripts/finalize_guidance.py \
 Use `--generator claude` in Claude. Security v1 has no raw-extraction CLI
 contract, so use `E` and `S` citations unless a valid private raw extraction
 directory is independently available. A missing or invalid candidate draft
-falls back only that candidate; the mode and sanitized reason are visible in
-both Markdown and `guidance_manifest.json`.
+falls back only that candidate; the sanitized reason appears as a subtle
+Markdown note and the complete mode record remains in `guidance_manifest.json`.
 
 Require the enriched layout:
 
@@ -301,9 +301,7 @@ COMPLETE_RUN/
 │   ├── extracted.json
 │   ├── score.json
 │   ├── analysis.json
-│   ├── deterministic_suggestions.md
 │   └── suggestions.md
-├── deterministic_interview_questions/<candidate>.md
 ├── interview_questions/<candidate>.md
 ├── guidance_manifest.json
 └── batch_summary.json
@@ -313,8 +311,12 @@ The offline finalizer validates candidate membership, UTF-8, size, references,
 exact increment headings, score restatement, raw hashes/lines when present,
 exactly ten questions, contacts, instruction-like content, symlinks, paths, and
 permissions before atomic publication. Confirm final `suggestions.md` embeds
-the unchanged deterministic report before `# 本地 LLM 个性化增强`, and that the
-three deterministic JSON files and batch summary remain byte-identical.
+the deterministic report body before `## 个性化建议增强`, keeps the original
+report-version footer as its final line, and does not expose the generator or a
+success-mode banner. The three deterministic JSON files and batch summary must
+remain byte-identical. Deterministic Markdown stays in private staging; its
+source hashes remain auditable in the manifest without publishing duplicate
+human-readable files.
 
 ## Calibration
 

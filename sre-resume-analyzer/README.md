@@ -8,8 +8,8 @@ to canonical v3 JSON. Python only validates canonical JSON, scores it
 deterministically with profile `cn-campus-sre`, renders reports, and atomically
 publishes a model-free staging run. For the complete Skill, the current local
 Codex/Claude generates cited guidance increments and the offline finalizer
-validates them, appends them to the unchanged deterministic report, and
-atomically publishes the result. No model API or additional API Key is used.
+validates them and atomically publishes one unified `suggestions.md` with the
+report-version footer last. No model API or additional API Key is used.
 
 ## Environment
 
@@ -105,9 +105,10 @@ The finalizer is offline. It validates candidate membership, UTF-8, file size,
 JSON Pointer and raw-line citations, exact increment headings, score
 restatement, exactly ten interview questions, contact leakage, instruction-like
 content, symlinks, permissions, and paths. On success, final `suggestions.md`
-embeds the unchanged deterministic report and appends `# 本地 LLM 个性化增强`.
-A single invalid draft uses a visibly marked deterministic fallback without
-changing that candidate's score.
+keeps the deterministic report body, appends `## 个性化建议增强`, and moves the
+original report-version footer to the final line. It contains no visible
+generator or success-mode banner. A single invalid draft uses a subtle
+deterministic fallback note without changing that candidate's score.
 
 ```text
 COMPLETE_RUN/
@@ -115,9 +116,7 @@ COMPLETE_RUN/
 │   ├── extracted.json
 │   ├── score.json
 │   ├── analysis.json
-│   ├── deterministic_suggestions.md
 │   └── suggestions.md
-├── deterministic_interview_questions/<candidate>.md
 ├── interview_questions/<candidate>.md
 ├── guidance_manifest.json
 └── batch_summary.json
@@ -125,7 +124,9 @@ COMPLETE_RUN/
 
 `guidance_manifest.json` records the requested generator, LLM/fallback counts,
 sanitized per-candidate modes, source hashes, citation counts, and final artifact
-SHA-256 values without storing contact details or raw excerpts.
+SHA-256 values without storing contact details or raw excerpts. The deterministic
+Markdown inputs remain private staging artifacts; only their source hashes are
+carried into the final manifest.
 
 ## Scoring
 

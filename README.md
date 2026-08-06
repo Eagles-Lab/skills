@@ -61,8 +61,9 @@ incremental guidance drafts from the original evidence and deterministic JSON.
 The offline `scripts/finalize_guidance.py` in each Skill validates citations,
 raw hashes and line ranges, score restatement, ten-question structure, privacy,
 instruction-like content, paths, symlinks, and permissions before atomically
-publishing an enriched run. Final `suggestions.md` embeds the unchanged Python
-report and appends the validated local-model enhancement; the Python originals
-also remain available as `deterministic_suggestions.md` and
-`deterministic_interview_questions/`. The manifest records per-candidate modes,
-and the finalizer never modifies scores.
+publishing an enriched run. Final `suggestions.md` preserves the Python report
+body, appends `## 个性化建议增强`, and moves the original report-version
+footer to the end. It is the only published suggestions report: deterministic
+Markdown stays in private staging, while its hashes remain in the manifest.
+Successful Markdown does not display the generator or a mode banner. The
+manifest records per-candidate modes, and the finalizer never modifies scores.

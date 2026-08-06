@@ -53,20 +53,20 @@ def create_draft(deterministic_run: Path, draft_root: Path) -> None:
     draft_root.mkdir(mode=0o700)
     destination = draft_root / candidate.name
     destination.mkdir(mode=0o700)
-    suggestions = f"""## 逐段经历点评
+    suggestions = f"""### 逐段经历点评
 
 - 该经历提供了可核验的实现事实, 仍应明确个人边界和验收方式。[E1] [S1]
 - 该经历的后续核验应区分已有事实、个人贡献和仍需确认的结果。[E1] [S1]
 
-## 改写示例
+### 改写示例
 
 - 改写时保留已有实现事实, 并使用【待补充{FULLWIDTH_COLON}个人职责和验收结果】标记缺口。[E1]
 
-## 成长建议
+### 成长建议
 
 - 建议补充可复现的验证记录, 以解决当前证据缺口。[S1]
 
-## 证据索引
+### 证据索引
 
 - [E1] extracted.json#{experience}
 - [S1] score.json#{weak_dimension}

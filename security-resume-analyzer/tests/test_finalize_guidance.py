@@ -70,7 +70,10 @@ def _candidate(run: Path, name: str, digest: str) -> None:
     _json(candidate / "extracted.json", extracted)
     _json(candidate / "score.json", score)
     _json(candidate / "analysis.json", analysis)
-    _write(candidate / "suggestions.md", "# 确定性建议\n\n- 保留事实边界。\n")
+    _write(
+        candidate / "suggestions.md",
+        "# 确定性建议\n\n- 保留事实边界。\n\n---\n\n报告版本：3.0.0-rc.2（experimental）\n",
+    )
     questions = "# 确定性面试题\n\n" + "\n".join(
         f"## {index}. 确定性问题 {index}\n\n请说明证据。" for index in range(1, 11)
     )
@@ -90,20 +93,20 @@ def _run(tmp_path: Path, names: tuple[str, ...] = ("候选人-aaaaaaaa",)) -> Pa
 
 
 def _valid_suggestions() -> str:
-    return """## 逐段经历点评
+    return """### 逐段经历点评
 
 - 项目描述给出了实现和验证动作，可继续补充个人责任边界。[E1]
 - 实习只说明参与交付，建议补充分工和验收方法。[E2] [S1]
 
-## 改写示例
+### 改写示例
 
 - 改写为：负责示例平台实现，并通过【待补充：验收方法】验证结果。[E1]
 
-## 成长建议
+### 成长建议
 
 - 建议补做可复现的验证记录，以解决结果证据缺口。[S1]
 
-## 证据索引
+### 证据索引
 
 - [E1] extracted.json#/projects/0
 - [E2] extracted.json#/internships/0
@@ -176,7 +179,7 @@ def _candidate_record(manifest: dict[str, object], index: int = 0) -> dict[str, 
     return value
 
 
-def test_complete_llm_draft_preserves_deterministic_artifacts(tmp_path: Path) -> None:
+def test_complete_llm_draft_publishes_one_unified_report(tmp_path: Path) -> None:
     run = _run(tmp_path)
     name = "候选人-aaaaaaaa"
     draft = _drafts(tmp_path, (name,))
@@ -210,25 +213,30 @@ def test_complete_llm_draft_preserves_deterministic_artifacts(tmp_path: Path) ->
     assert (output / f"resume_analysis/{name}/analysis.json").read_bytes() == before[
         f"resume_analysis/{name}/analysis.json"
     ]
-    assert (output / f"resume_analysis/{name}/deterministic_suggestions.md").read_bytes() == before[
-        f"resume_analysis/{name}/suggestions.md"
-    ]
-    assert (output / f"deterministic_interview_questions/{name}.md").read_bytes() == before[
-        f"interview_questions/{name}.md"
-    ]
+    assert {path.name for path in (output / f"resume_analysis/{name}").iterdir()} == {
+        "extracted.json",
+        "score.json",
+        "analysis.json",
+        "suggestions.md",
+    }
+    assert not (output / "deterministic_interview_questions").exists()
     assert (output / "batch_summary.json").read_bytes() == before["batch_summary.json"]
     final_suggestions = (output / f"resume_analysis/{name}/suggestions.md").read_bytes()
     deterministic_suggestions = before[f"resume_analysis/{name}/suggestions.md"]
-    assert final_suggestions.startswith(
-        "> 生成模式：本地 Codex 个性化增强；确定性报告与评分未修改。\n\n".encode()
-    )
-    assert final_suggestions.count(deterministic_suggestions) == 1
-    deterministic_end = final_suggestions.index(deterministic_suggestions) + len(
-        deterministic_suggestions
-    )
-    enhancement_start = final_suggestions.index(guidance.LLM_ENHANCEMENT_HEADING.encode())
-    assert enhancement_start > deterministic_end
-    assert final_suggestions.rstrip().endswith(b"score.json#/dimension_scores/foundation")
+    deterministic_body, footer = guidance._split_report_footer(deterministic_suggestions)
+    assert final_suggestions.startswith(deterministic_body)
+    assert final_suggestions.count(deterministic_body) == 1
+    enhancement_start = final_suggestions.index(guidance.PERSONALIZED_ENHANCEMENT_HEADING.encode())
+    assert enhancement_start > len(deterministic_body)
+    assert final_suggestions.index("### 证据索引".encode()) > enhancement_start
+    assert final_suggestions.rstrip().endswith(footer.rstrip())
+    assert b"Codex" not in final_suggestions
+    assert b"Claude" not in final_suggestions
+    assert "本地 LLM".encode() not in final_suggestions
+    assert "生成模式".encode() not in final_suggestions
+    assert (output / f"interview_questions/{name}.md").read_bytes() == (
+        draft / name / "interview_questions.md"
+    ).read_bytes()
     assert stat.S_IMODE(output.stat().st_mode) == 0o700
     assert all(
         stat.S_IMODE(path.stat().st_mode) == (0o700 if path.is_dir() else 0o600)
@@ -239,7 +247,7 @@ def test_complete_llm_draft_preserves_deterministic_artifacts(tmp_path: Path) ->
     assert "@" not in json.dumps(on_disk)
 
 
-def test_missing_drafts_fall_back_with_explicit_headers(tmp_path: Path) -> None:
+def test_missing_drafts_fall_back_with_subtle_notes(tmp_path: Path) -> None:
     run = _run(tmp_path)
     output = tmp_path / "final"
     manifest = _finalize(run, output)
@@ -250,13 +258,16 @@ def test_missing_drafts_fall_back_with_explicit_headers(tmp_path: Path) -> None:
     assert record["mode"] == "deterministic_fallback"
     assert record["fallback_reason"] == "missing_draft"
     assert (
-        "确定性模板回退" in (output / "resume_analysis/候选人-aaaaaaaa/suggestions.md").read_text()
+        "个性化建议增强未生成"
+        in (output / "resume_analysis/候选人-aaaaaaaa/suggestions.md").read_text()
     )
     assert (
-        guidance.LLM_ENHANCEMENT_HEADING
+        guidance.PERSONALIZED_ENHANCEMENT_HEADING
         not in (output / "resume_analysis/候选人-aaaaaaaa/suggestions.md").read_text()
     )
-    assert "确定性模板回退" in (output / "interview_questions/候选人-aaaaaaaa.md").read_text()
+    suggestions = (output / "resume_analysis/候选人-aaaaaaaa/suggestions.md").read_text()
+    assert suggestions.rstrip().endswith("报告版本：3.0.0-rc.2（experimental）")
+    assert "个性化面试题未生成" in (output / "interview_questions/候选人-aaaaaaaa.md").read_text()
 
 
 def test_partial_draft_causes_only_candidate_local_fallback(tmp_path: Path) -> None:
@@ -390,14 +401,14 @@ def test_uncited_prose_and_out_of_order_sections_fall_back(tmp_path: Path) -> No
     path = draft / name / "suggestions.md"
     _write(
         path,
-        path.read_text().replace("## 逐段经历点评", "## 逐段经历点评\n\n未引用诊断"),
+        path.read_text().replace("### 逐段经历点评", "### 逐段经历点评\n\n未引用诊断"),
     )
     manifest = _finalize(run, tmp_path / "prose-output", draft=draft)
     assert _candidate_record(manifest)["fallback_reason"] == "invalid_structure"
 
     text = _valid_suggestions().replace(
-        "## 改写示例",
-        "## 临时章节\n\n- 临时内容。[E1]\n\n## 改写示例",
+        "### 改写示例",
+        "### 临时章节\n\n- 临时内容。[E1]\n\n### 改写示例",
     )
     _write(path, text)
     manifest = _finalize(run, tmp_path / "order-output", draft=draft)
@@ -415,6 +426,18 @@ def test_legacy_full_report_draft_falls_back(tmp_path: Path) -> None:
     )
 
     manifest = _finalize(run, tmp_path / "legacy-output", draft=draft)
+
+    assert _candidate_record(manifest)["fallback_reason"] == "invalid_structure"
+
+
+def test_old_h2_incremental_draft_falls_back(tmp_path: Path) -> None:
+    run = _run(tmp_path)
+    name = "候选人-aaaaaaaa"
+    draft = _drafts(tmp_path, (name,))
+    path = draft / name / "suggestions.md"
+    _write(path, path.read_text().replace("### ", "## "))
+
+    manifest = _finalize(run, tmp_path / "old-increment-output", draft=draft)
 
     assert _candidate_record(manifest)["fallback_reason"] == "invalid_structure"
 
@@ -567,3 +590,13 @@ def test_manifest_hashes_match_final_files(tmp_path: Path) -> None:
     assert isinstance(artifacts, dict)
     final = output / "resume_analysis/候选人-aaaaaaaa/suggestions.md"
     assert artifacts["suggestions_sha256"] == hashlib.sha256(final.read_bytes()).hexdigest()
+    assert (
+        artifacts["deterministic_suggestions_sha256"]
+        == hashlib.sha256(
+            (run / "resume_analysis/候选人-aaaaaaaa/suggestions.md").read_bytes()
+        ).hexdigest()
+    )
+    assert (
+        artifacts["deterministic_interview_questions_sha256"]
+        == hashlib.sha256((run / "interview_questions/候选人-aaaaaaaa.md").read_bytes()).hexdigest()
+    )

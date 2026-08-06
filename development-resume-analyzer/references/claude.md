@@ -13,13 +13,14 @@ Do not hard-code a nonexistent pseudo-tool call.
    grounding audit records the source hash; write it to `deterministic-run`.
 5. Read [the local guidance contract](local-guidance-layer.md). Use the current
    Claude context to generate private evidence-cited drafts. Keep
-   `suggestions.md` to the three-section increment without a title, overview,
-   score, grade, dimensions, or quality score; do not call a model API or modify
-   deterministic facts and scores.
+   `suggestions.md` to the three-subsection increment with the required
+   level-three headings and without a title, overview, score, grade, dimensions,
+   or quality score; do not call a model API or modify deterministic facts and
+   scores.
 6. Run `scripts/finalize_guidance.py` with generator `claude`, then verify the
-   same score JSON, the deterministic report embedded unchanged before the
-   enhancement, individualized citations, manifest modes, enriched output,
-   permissions, and ten-question structure as Codex.
+   same score JSON, one unified suggestions report with its version footer last,
+   individualized citations, no visible success generator banner, manifest
+   modes, enriched output, permissions, and ten-question structure as Codex.
 
 Platform readers may produce different raw layouts, but both adapters must
 produce semantically equivalent canonical JSON before Python scoring.

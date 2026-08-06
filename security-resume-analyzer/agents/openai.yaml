@@ -1,4 +1,4 @@
 interface:
   display_name: "Security Resume Analyzer"
-  short_description: "Campus security report with cited local enhancement"
-  default_prompt: "Use $security-resume-analyzer to map and score this campus security resume, append locally grounded cited guidance to the unchanged deterministic report, generate ten interview questions, then validate and atomically publish the private enriched run."
+  short_description: "Campus security report with cited personalized guidance"
+  default_prompt: "Use $security-resume-analyzer to map and score this campus security resume, add locally grounded cited guidance, generate ten interview questions, then validate and atomically publish one unified private suggestions report with its version footer last."
