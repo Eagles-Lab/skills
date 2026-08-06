@@ -1,6 +1,6 @@
 ---
 name: sre-resume-analyzer
-description: Analyze Chinese internship and campus-hire SRE resumes by mapping PDF, DOCX, Markdown, or supplied facts to canonical v3 JSON, then running deterministic cn-campus-sre evidence scoring, resume-quality diagnosis, suggestions, and interview-question generation. Use for individual or batch campus SRE resume review and resume-grounded interview preparation. Do not use for senior-role assessment, unrelated roles, candidate ranking, or hiring decisions.
+description: Analyze Chinese internship and campus-hire SRE resumes by mapping PDF, DOCX, Markdown, or supplied facts to canonical v3 JSON, running deterministic cn-campus-sre evidence scoring and audit, then using the current local Codex or Claude to generate validated evidence-cited guidance and interview questions with per-candidate deterministic fallback. Use for individual or batch campus SRE resume review and resume-grounded interview preparation. Do not use for senior-role assessment, unrelated roles, candidate ranking, or hiring decisions.
 ---
 
 # SRE Resume Analyzer
@@ -42,6 +42,10 @@ For scoring explanations, also read:
 
 - [Evidence model](references/evidence-model.md)
 - [Scoring rubric](references/scoring-rubric.md)
+
+Before generating final suggestions or interview questions, also read:
+
+- [Local LLM guidance layer](references/local-guidance-layer.md)
 
 Use [the generated JSON Schema](references/extracted_resume.schema.json) when a
 machine-readable contract is needed. All operational references are one hop
@@ -151,8 +155,11 @@ Validate errors by JSON path without echoing full candidate content.
 uv run --frozen analyze-resume \
   --extracted ./resume.json \
   --raw-extraction ./raw_extraction.json \
-  --output-dir ./candidate-run
+  --output-dir ./deterministic-run
 ```
+
+The Python output is the deterministic staging run. Keep it private and do not
+edit any JSON or score before the local guidance layer.
 
 Omit `--raw-extraction` only for canonical JSON supplied as the source of
 truth. PDF, DOCX, Markdown, and cached canonical mappings require it. Never
@@ -200,7 +207,7 @@ The batch precomputes internal IDs, visible names, and input hashes before
 workers start. A repeated full input or output-name collision fails preflight.
 One candidate failure does not cancel other candidates.
 
-## Verify the run layout
+## Verify the deterministic Python layout
 
 Require this layout:
 
@@ -241,6 +248,61 @@ Confirm:
 - reports contain no legacy dimensions, AI bonus, or per-dimension letter;
 - every interview file contains exactly ten deterministic questions.
 
+This five-file contract belongs to the Python CLI and remains backward
+compatible. Do not rename its files or make the CLI depend on a model.
+
+## Generate and publish the complete Skill result
+
+Read [Local LLM guidance layer](references/local-guidance-layer.md). For every
+candidate, the current Codex/Claude reads the original evidence and the three
+JSON files, then creates candidate-isolated `suggestions.md` and
+`interview_questions.md` drafts. It must not edit facts, scores, evidence
+groups, hashes, timestamps, or calibration state.
+
+Write individualized observations, rewrite examples, growth advice, and ten
+interview questions with resolvable `[E]`, `[S]`, and optional `[R]` citations.
+Use `【待补充：…】` instead of inventing missing facts. Do not call OpenAI,
+Anthropic, or another model API; the model running this Skill is the generator.
+
+Then run:
+
+```bash
+uv run --frozen python scripts/finalize_guidance.py \
+  --deterministic-run ./deterministic-run \
+  --draft-dir ./guidance-drafts \
+  --output-dir ./complete-run \
+  --generator codex \
+  --raw-extraction-dir ./raw-extractions
+```
+
+Use `--generator claude` in Claude. Omit the raw directory only when canonical
+JSON is the supplied source of truth; omit the draft directory to request an
+explicit all-candidate fallback. A bad or missing candidate draft falls back
+only that candidate. A candidate-set, path, symlink, deterministic-input, or
+atomic-publication error fails the complete publish.
+
+Verify `guidance_manifest.json`, both deterministic copies, final mode headers,
+file hashes, reference counts, and this enriched layout:
+
+```text
+COMPLETE_RUN/
+├── resume_analysis/<candidate>/
+│   ├── extracted.json
+│   ├── score.json
+│   ├── analysis.json
+│   ├── deterministic_suggestions.md
+│   └── suggestions.md
+├── deterministic_interview_questions/<candidate>.md
+├── interview_questions/<candidate>.md
+├── guidance_manifest.json
+└── batch_summary.json
+```
+
+The finalizer validates UTF-8, sizes, references, raw hashes and lines, exactly
+ten questions, privacy, instruction-like content, private permissions, and
+path safety before a sibling-staging rename. It never changes the deterministic
+JSON or score.
+
 ## Explain results responsibly
 
 The six dimensions are systems/network foundations, programming/automation,
@@ -273,7 +335,8 @@ ranking or hiring decisions.
 
 ## Return to the user
 
-Report the private run root, success/failure counts, overall evidence grade,
-strongest and weakest dimensions, contact inclusion policy, and validation
+Report the private complete run root, deterministic success/failure counts,
+LLM/fallback counts from `guidance_manifest.json`, overall evidence grade,
+strongest and weakest dimensions, contact exclusion policy, and validation
 status. Do not paste names, contacts, or full resume text into chat unless
 explicitly necessary.

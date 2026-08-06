@@ -1,6 +1,6 @@
 ---
 name: development-resume-analyzer
-description: Analyze Chinese internship and campus-hire software-development resumes with one general evidence profile. Map PDF, DOCX, Markdown, or supplied facts to canonical development schema v1, audit raw-source grounding, deduplicate cross-format candidates, run deterministic six-dimension scoring, diagnose resume evidence quality, and generate improvement suggestions plus interview questions. Use for frontend, backend, client, full-stack, general software-engineering, and AI-application development resume review. Do not use for senior-role assessment, candidate ranking, or hiring decisions.
+description: Analyze Chinese internship and campus-hire software-development resumes with one general evidence profile. Map PDF, DOCX, Markdown, or supplied facts to canonical development schema v1, audit and score them deterministically, then use the current local Codex or Claude to generate validated evidence-cited guidance and interview questions with per-candidate deterministic fallback. Use for frontend, backend, client, full-stack, general software-engineering, and AI-application development resume review. Do not use for senior-role assessment, candidate ranking, or hiring decisions.
 ---
 
 # Development Resume Analyzer
@@ -30,6 +30,8 @@ Read only the references needed for the current task:
 - [Privacy and security](references/privacy-security.md)
 - [Codex adapter](references/codex.md)
 - [Claude adapter](references/claude.md)
+- [Local LLM guidance layer](references/local-guidance-layer.md), before final
+  suggestions or interview questions
 
 All references are one direct hop from this file. Do not invent an unstated
 schema field, weight, score bonus, profile, or platform-specific tool call.
@@ -135,8 +137,11 @@ Install and run through the pinned project:
 uv sync --frozen
 uv run --frozen analyze-development-resume \
   --extracted canonical.json \
-  --output-dir analysis-run
+  --output-dir deterministic-run
 ```
+
+This output is a private deterministic staging run. Do not edit its facts,
+scores, analysis, hashes, or template Markdown.
 
 Use `--include-contact` only when the user explicitly requests contact details
 in Markdown. Use `--overwrite` only when replacement of the complete target run
@@ -216,29 +221,43 @@ Fail identity conflicts for manual review. Keep the highest-coverage canonical
 as primary, fill only missing consistent facts, preserve structured conflicts,
 and never score a repeated experience twice.
 
-## Verify outputs
+## Verify the deterministic Python output
 
-Expect one atomic run root:
+The stable, model-free Python contract has four candidate files
+(`extracted.json`, `score.json`, `analysis.json`, `suggestions.md`) and one
+ten-question interview file; batches add `batch_summary.json`. Verify matching
+output names, hashes, default contact omission, `0700` directories, and `0600`
+files. Existing outputs conflict unless `--overwrite` is explicit. Never accept
+a partial run.
 
-```text
-OUTPUT_DIR/
-├── resume_analysis/
-│   └── 姓名-a1b2c3d4/
-│       ├── extracted.json
-│       ├── score.json
-│       ├── analysis.json
-│       └── suggestions.md
-├── interview_questions/
-│   └── 姓名-a1b2c3d4.md
-└── batch_summary.json
+## Generate and publish the complete Skill output
+
+Read [Local LLM guidance layer](references/local-guidance-layer.md). The current
+Codex/Claude reads original evidence and the three JSON files, then creates
+private candidate drafts. It is the generator: do not call a model API, request
+an API Key, change deterministic files, or invent facts. Generate diagnosis,
+per-experience critique, grounded rewrites, growth advice, and exactly ten
+questions. Cite material statements with `[E]`, `[S]`, or optional `[R]`; use
+`【待补充：…】` for missing facts.
+
+Then run:
+
+```bash
+uv run --frozen python scripts/finalize_guidance.py \
+  --deterministic-run ./deterministic-run \
+  --draft-dir ./guidance-drafts \
+  --output-dir ./complete-run \
+  --generator codex \
+  --raw-extraction-dir ./raw-extractions
 ```
 
-Single analysis omits `batch_summary.json`. Verify four analysis files, one
-ten-question interview file, matching output names, stable hashes, hidden
-contact data by default, directory mode `0700`, and file mode `0600`.
-
-Treat an existing output root as a conflict unless `--overwrite` was requested.
-Never publish a partially written candidate directory.
+Use generator `claude` in Claude. Omit raw evidence only for direct canonical
+input and omit drafts for explicit all-candidate fallback. One invalid draft
+only falls back its candidate. Verify manifest modes/reasons, source hashes,
+reference counts, artifact SHA-256, deterministic copies, final Markdown, and
+`batch_summary.json`. The finalizer validates structure, evidence, privacy,
+permissions, and paths before atomic publication; deterministic JSON and an
+existing batch summary must remain byte-identical.
 
 ## Report failures
 
@@ -251,6 +270,7 @@ Use the stable exit meanings:
 - `4`: PDF extraction failure;
 - `5`: output conflict, unsafe path, or write failure.
 
-Report only source hashes, counts, status, and sanitized error categories. Do
-not expose names, contacts, raw excerpts, private canonical data, or scores as a
-candidate ranking.
+Report only the private complete run root, source hashes, deterministic counts,
+LLM/fallback counts from `guidance_manifest.json`, status, and sanitized error
+categories. Do not expose names, contacts, raw excerpts, private canonical data,
+or scores as a candidate ranking.

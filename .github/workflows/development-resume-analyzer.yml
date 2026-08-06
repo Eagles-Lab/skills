@@ -82,7 +82,7 @@ jobs:
             --requirement runtime-requirements.txt
 
       - name: Static security scan
-        run: uv run --frozen bandit -q -r src -ll
+        run: uv run --frozen bandit -q -r src scripts/finalize_guidance.py -ll
 
       - name: Build wheel and verify a clean CLI install
         shell: bash
@@ -102,6 +102,14 @@ jobs:
           test "$(find "$wheel_root/output/resume_analysis" -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 1
           test "$(find "$wheel_root/output/resume_analysis" -type f | wc -l)" -eq 4
           test "$(find "$wheel_root/output/interview_questions" -type f -name '*.md' | wc -l)" -eq 1
+          uv run --frozen python scripts/finalize_guidance.py \
+            --deterministic-run "$wheel_root/output" \
+            --output-dir "$wheel_root/enriched" \
+            --generator codex
+          test "$(find "$wheel_root/enriched/resume_analysis" -type f | wc -l)" -eq 5
+          test "$(find "$wheel_root/enriched/deterministic_interview_questions" -type f -name '*.md' | wc -l)" -eq 1
+          test -f "$wheel_root/enriched/guidance_manifest.json"
+          uv run --frozen python -c 'import json,sys; value=json.load(open(sys.argv[1])); assert value["counts"] == {"total": 1, "llm": 0, "fallback": 1}' "$wheel_root/enriched/guidance_manifest.json"
 
   skill-surface:
     name: Skill metadata and links

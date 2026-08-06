@@ -6,7 +6,9 @@ resume evidence. It is a review aid, not a ranking or hiring-decision system.
 The Agent maps explicit facts from PDF, DOCX, Markdown, or user-supplied content
 to canonical v3 JSON. Python only validates canonical JSON, scores it
 deterministically with profile `cn-campus-sre`, renders reports, and atomically
-publishes a complete run.
+publishes a model-free staging run. For the complete Skill, the current local
+Codex/Claude generates cited guidance drafts and the offline finalizer validates
+and atomically publishes them. No model API or additional API Key is used.
 
 ## Environment
 
@@ -57,7 +59,7 @@ uv run --frozen batch-analyze \
 A partial batch returns 3 and atomically publishes complete successes plus a
 redacted `batch_summary.json`.
 
-## Output layout
+## Deterministic Python output
 
 ```text
 RUN_ROOT/
@@ -74,6 +76,51 @@ RUN_ROOT/
 
 The whole root is built in a private sibling temporary directory and published
 once. Directories use `0700`; files use `0600`.
+
+This is the stable legacy CLI contract. Its `suggestions.md` and interview file
+come from deterministic templates and remain available without a model.
+
+## Complete Skill output
+
+Read [local-guidance-layer.md](references/local-guidance-layer.md). After the
+deterministic run, the current Codex or Claude produces private per-candidate
+drafts with citations to canonical facts, scores, and optionally raw source
+lines. It must not change JSON, scores, or invent experience.
+
+Publish with:
+
+```bash
+uv run --frozen python scripts/finalize_guidance.py \
+  --deterministic-run deterministic-run \
+  --draft-dir guidance-drafts \
+  --output-dir complete-run \
+  --generator codex \
+  --raw-extraction-dir raw-extractions
+```
+
+The finalizer is offline. It validates candidate membership, UTF-8, file size,
+JSON Pointer and raw-line citations, exactly ten interview questions, contact
+leakage, instruction-like content, symlinks, permissions, and paths. A single
+invalid draft uses a visibly marked deterministic fallback without changing
+that candidate's score.
+
+```text
+COMPLETE_RUN/
+├── resume_analysis/<candidate>/
+│   ├── extracted.json
+│   ├── score.json
+│   ├── analysis.json
+│   ├── deterministic_suggestions.md
+│   └── suggestions.md
+├── deterministic_interview_questions/<candidate>.md
+├── interview_questions/<candidate>.md
+├── guidance_manifest.json
+└── batch_summary.json
+```
+
+`guidance_manifest.json` records the requested generator, LLM/fallback counts,
+sanitized per-candidate modes, source hashes, citation counts, and final artifact
+SHA-256 values without storing contact details or raw excerpts.
 
 ## Scoring
 

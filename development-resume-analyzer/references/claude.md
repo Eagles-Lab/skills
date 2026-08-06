@@ -10,9 +10,13 @@ Do not hard-code a nonexistent pseudo-tool call.
 3. Map only grounded facts to canonical development schema v1; use `null` or
    `[]` when recovery is unreliable.
 4. Run the shared Python CLI and pass `--raw-extraction` so the deterministic
-   grounding audit records the source hash.
-5. Verify the same score JSON, report semantics, output layout, permissions,
-   and ten-question contract as Codex.
+   grounding audit records the source hash; write it to `deterministic-run`.
+5. Read [the local guidance contract](local-guidance-layer.md). Use the current
+   Claude context to generate private evidence-cited drafts without calling a
+   model API or modifying deterministic facts and scores.
+6. Run `scripts/finalize_guidance.py` with generator `claude`, then verify the
+   same score JSON, individualized citations, manifest modes, enriched output,
+   permissions, and ten-question structure as Codex.
 
 Platform readers may produce different raw layouts, but both adapters must
 produce semantically equivalent canonical JSON before Python scoring.

@@ -8,14 +8,15 @@ Reusable agent skills maintained in this repository.
 v3.0 skill for evidence-based analysis of SRE, DevOps, platform engineering,
 and operations resumes.
 
-The workflow separates untrusted document extraction from deterministic
-analysis:
+The workflow separates untrusted document extraction, deterministic analysis,
+and local-model guidance:
 
 ```text
-PDF -> agent extraction -> canonical v3 JSON -> deterministic CLI -> five outputs
+document -> agent mapping -> canonical JSON -> deterministic Python staging
+         -> current Codex/Claude guidance drafts -> offline validation -> enriched run
 ```
 
-The current release candidate is `3.0.0-rc.1`. It rejects v2 input and must not
+The current release candidate is `3.0.0-rc.2`. It rejects v2 input and must not
 be used as the sole basis for hiring decisions. Stable release requires private,
 de-identified calibration and real Codex and Claude forward tests.
 
@@ -32,6 +33,11 @@ The runtime contract is stable, but scoring is not human-calibrated. Every
 result declares `calibration_status: not_calibrated` and must not be used for
 candidate ranking or hiring decisions.
 
+The complete Skill adds individualized, evidence-cited suggestions and ten
+interview questions through the current local Codex/Claude context. The Python
+CLI remains deterministic and backward-compatible; invalid model drafts fall
+back per candidate.
+
 ## Development Resume Analyzer
 
 [`development-resume-analyzer`](development-resume-analyzer/SKILL.md) is a
@@ -42,3 +48,19 @@ backend, client, full-stack, and AI application development.
 The score is explicitly `not_calibrated`: it measures documented evidence
 coverage and must not be used for candidate ranking or hiring decisions. Raw
 PDF, DOCX, and Markdown workflows require source-to-canonical grounding audits.
+
+## Deterministic CLI versus complete Skill
+
+All three Python CLIs keep their original candidate contract:
+`extracted.json`, `score.json`, `analysis.json`, deterministic
+`suggestions.md`, and one deterministic interview file. They do not call a
+model API and do not need an API Key.
+
+When the complete Skill runs, the current Codex or Claude instance generates
+private drafts from the original evidence and deterministic JSON. The offline
+`scripts/finalize_guidance.py` in each Skill validates citations, raw hashes and
+line ranges, ten-question structure, privacy, instruction-like content, paths,
+symlinks, and permissions before atomically publishing an enriched run. It
+preserves the Python templates as `deterministic_suggestions.md` and
+`deterministic_interview_questions/`, records per-candidate modes in
+`guidance_manifest.json`, and never modifies scores.
