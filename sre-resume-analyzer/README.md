@@ -1,5 +1,8 @@
 # SRE Resume Analyzer
 
+Python package, installation, and CLI documentation for `sre-resume-analyzer`.
+For the agent workflow, start with [SKILL.md](SKILL.md).
+
 Experimental `3.0.0-rc.2` analyzer for domestic internship and campus-hire SRE
 resume evidence. It is a review aid, not a ranking or hiring-decision system.
 

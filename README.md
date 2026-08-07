@@ -7,7 +7,7 @@ internship and campus-hire resumes.
 
 | Analyzer | Scope | Version and status | Documentation |
 | --- | --- | --- | --- |
-| SRE | SRE, DevOps, platform engineering, and operations | `3.0.0-rc.2`, experimental | [README](sre-resume-analyzer/README.md) |
+| SRE | SRE, DevOps, platform engineering, and operations | `3.0.0-rc.2`, experimental | [SKILL.md](sre-resume-analyzer/SKILL.md) |
 | Security | General campus security engineering | `1.0.0`, stable runtime, `not_calibrated` | [SKILL.md](security-resume-analyzer/SKILL.md) |
 | Development | Frontend, backend, client, full-stack, and AI applications | `1.0.0`, stable interface, `not_calibrated` | [SKILL.md](development-resume-analyzer/SKILL.md) |
 
