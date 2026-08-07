@@ -49,21 +49,9 @@ The score is explicitly `not_calibrated`: it measures documented evidence
 coverage and must not be used for candidate ranking or hiring decisions. Raw
 PDF, DOCX, and Markdown workflows require source-to-canonical grounding audits.
 
-## Deterministic CLI versus complete Skill
+## Analyzer interfaces
 
-All three Python CLIs keep their original candidate contract:
-`extracted.json`, `score.json`, `analysis.json`, deterministic
-`suggestions.md`, and one deterministic interview file. They do not call a
-model API and do not need an API Key.
-
-When the complete Skill runs, the current Codex or Claude instance generates
-incremental guidance drafts from the original evidence and deterministic JSON.
-The offline `scripts/finalize_guidance.py` in each Skill validates citations,
-raw hashes and line ranges, score restatement, ten-question structure, privacy,
-instruction-like content, paths, symlinks, and permissions before atomically
-publishing an enriched run. Final `suggestions.md` preserves the Python report
-body, appends `## 个性化建议增强`, and moves the original report-version
-footer to the end. It is the only published suggestions report: deterministic
-Markdown stays in private staging, while its hashes remain in the manifest.
-Successful Markdown does not display the generator or a mode banner. The
-manifest records per-candidate modes, and the finalizer never modifies scores.
+The Python CLIs provide deterministic offline analysis without model API
+credentials. Running a complete Skill can add validated, evidence-cited
+personalized guidance without changing deterministic scores; see each
+analyzer's `SKILL.md` for its workflow and output contract.
