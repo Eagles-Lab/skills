@@ -18,6 +18,7 @@ def test_core_skill_is_compact_and_all_direct_references_exist() -> None:
         "references/deduplication.md",
         "references/document-workflow.md",
         "references/evidence-model.md",
+        "references/local-guidance-layer.md",
         "references/privacy-security.md",
         "references/scoring-rubric.md",
     }

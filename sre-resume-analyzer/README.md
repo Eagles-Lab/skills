@@ -6,7 +6,10 @@ resume evidence. It is a review aid, not a ranking or hiring-decision system.
 The Agent maps explicit facts from PDF, DOCX, Markdown, or user-supplied content
 to canonical v3 JSON. Python only validates canonical JSON, scores it
 deterministically with profile `cn-campus-sre`, renders reports, and atomically
-publishes a complete run.
+publishes a model-free staging run. For the complete Skill, the current local
+Codex/Claude generates cited guidance increments and the offline finalizer
+validates them and atomically publishes one unified `suggestions.md` with the
+report-version footer last. No model API or additional API Key is used.
 
 ## Environment
 
@@ -57,7 +60,7 @@ uv run --frozen batch-analyze \
 A partial batch returns 3 and atomically publishes complete successes plus a
 redacted `batch_summary.json`.
 
-## Output layout
+## Deterministic Python output
 
 ```text
 RUN_ROOT/
@@ -74,6 +77,56 @@ RUN_ROOT/
 
 The whole root is built in a private sibling temporary directory and published
 once. Directories use `0700`; files use `0600`.
+
+This is the stable legacy CLI contract. Its `suggestions.md` and interview file
+come from deterministic templates and remain available without a model.
+
+## Complete Skill output
+
+Read [local-guidance-layer.md](references/local-guidance-layer.md). After the
+deterministic run, the current Codex or Claude produces private per-candidate
+incremental drafts with citations to canonical facts, scores, and optionally
+raw source lines. The suggestions draft contains only per-experience critique,
+rewrite examples, growth advice, and its evidence index. It must not repeat the
+deterministic overview or scores, change JSON, or invent experience.
+
+Publish with:
+
+```bash
+uv run --frozen python scripts/finalize_guidance.py \
+  --deterministic-run deterministic-run \
+  --draft-dir guidance-drafts \
+  --output-dir complete-run \
+  --generator codex \
+  --raw-extraction-dir raw-extractions
+```
+
+The finalizer is offline. It validates candidate membership, UTF-8, file size,
+JSON Pointer and raw-line citations, exact increment headings, score
+restatement, exactly ten interview questions, contact leakage, instruction-like
+content, symlinks, permissions, and paths. On success, final `suggestions.md`
+keeps the deterministic report body, appends `## 个性化建议增强`, and moves the
+original report-version footer to the final line. It contains no visible
+generator or success-mode banner. A single invalid draft uses a subtle
+deterministic fallback note without changing that candidate's score.
+
+```text
+COMPLETE_RUN/
+├── resume_analysis/<candidate>/
+│   ├── extracted.json
+│   ├── score.json
+│   ├── analysis.json
+│   └── suggestions.md
+├── interview_questions/<candidate>.md
+├── guidance_manifest.json
+└── batch_summary.json
+```
+
+`guidance_manifest.json` records the requested generator, LLM/fallback counts,
+sanitized per-candidate modes, source hashes, citation counts, and final artifact
+SHA-256 values without storing contact details or raw excerpts. The deterministic
+Markdown inputs remain private staging artifacts; only their source hashes are
+carried into the final manifest.
 
 ## Scoring
 

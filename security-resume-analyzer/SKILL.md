@@ -1,6 +1,6 @@
 ---
 name: security-resume-analyzer
-description: "Analyze Chinese internship and campus-hire security resumes with one general cn-campus-security-general profile. Map PDF, DOCX, Markdown, or supplied facts to canonical security schema v1, then run deterministic evidence scoring, cross-format candidate deduplication, resume-quality diagnosis, suggestions, and interview-question generation. Use for individual or batch campus security resume review and grounded interview preparation across vulnerability research, security engineering, operations, incident response, cloud security, and AI security. Do not use for senior-role assessment, candidate ranking, or hiring decisions."
+description: "Analyze Chinese internship and campus-hire security resumes with one general cn-campus-security-general profile. Map PDF, DOCX, Markdown, or supplied facts to canonical security schema v1, run deterministic evidence scoring, audit, and deduplication, then use the current local Codex or Claude to generate validated evidence-cited guidance and interview questions with per-candidate deterministic fallback. Use for campus security resume review and grounded interview preparation. Do not use for senior-role assessment, candidate ranking, or hiring decisions."
 ---
 
 # Security Resume Analyzer
@@ -43,6 +43,10 @@ For PDF, DOCX, or Markdown, also read:
 - [Document mapping workflow](references/document-workflow.md)
 - [Codex adapter](references/codex.md) when running in Codex, or
 - [Claude adapter](references/claude.md) when running in Claude.
+
+Before generating final suggestions or interview questions, also read:
+
+- [Local LLM guidance layer](references/local-guidance-layer.md)
 
 Use [the generated JSON Schema](references/extracted_resume.schema.json) for
 machine validation. References are one hop from this file.
@@ -130,8 +134,11 @@ Do not migrate or coerce them silently.
 ```bash
 uv run --frozen analyze-security-resume \
   --extracted ./resume.json \
-  --output-dir ./security-analysis
+  --output-dir ./deterministic-run
 ```
+
+This is the private deterministic staging run. Keep it byte-identical until
+the finalizer has copied and audited it.
 
 `--output-dir` names the complete run root. It must not exist unless the user
 explicitly requested `--overwrite`.
@@ -216,7 +223,7 @@ Resume quality is a separate zero-weight diagnostic. It covers personal
 contribution, authorization scope, method, validation/remediation, and
 clarity/consistency. It never changes the technical total.
 
-## Verify published output
+## Verify the deterministic Python output
 
 Require this layout:
 
@@ -251,6 +258,66 @@ The run is built in a private sibling temporary directory and published by one
 rename. `--overwrite` replaces the complete run and restores the prior run if
 publication fails. Never accept visible half-output.
 
+This four-analysis-file plus one-interview-file layout is the stable Python CLI
+contract. The CLI remains deterministic and does not call a model.
+
+## Generate and publish local-model guidance
+
+Read [Local LLM guidance layer](references/local-guidance-layer.md). The current
+Codex/Claude reads the original evidence plus `extracted.json`, `score.json`,
+and `analysis.json`, and writes private per-candidate drafts. The suggestions
+draft is only an increment containing per-experience critique, rewrite examples,
+growth work, and its evidence index. It must not repeat the deterministic
+overview, scores, grade, six dimensions, or quality diagnosis, and neither
+draft may change a fact, score, evidence group, source hash, or calibration
+state.
+
+Every critique, rewrite, suggestion, main question, follow-up, and verification
+point needs a resolvable citation. Missing claims use
+`【待补充：…】`; never invent authorization, vulnerability impact, remediation,
+production scope, or results. Do not call a model API or request an API Key.
+
+Validate and publish from the Skill directory:
+
+```bash
+uv run --frozen python scripts/finalize_guidance.py \
+  --deterministic-run ./deterministic-run \
+  --draft-dir ./guidance-drafts \
+  --output-dir ./complete-run \
+  --generator codex
+```
+
+Use `--generator claude` in Claude. Security v1 has no raw-extraction CLI
+contract, so use `E` and `S` citations unless a valid private raw extraction
+directory is independently available. A missing or invalid candidate draft
+falls back only that candidate; the sanitized reason appears as a subtle
+Markdown note and the complete mode record remains in `guidance_manifest.json`.
+
+Require the enriched layout:
+
+```text
+COMPLETE_RUN/
+├── resume_analysis/<candidate>/
+│   ├── extracted.json
+│   ├── score.json
+│   ├── analysis.json
+│   └── suggestions.md
+├── interview_questions/<candidate>.md
+├── guidance_manifest.json
+└── batch_summary.json
+```
+
+The offline finalizer validates candidate membership, UTF-8, size, references,
+exact increment headings, score restatement, raw hashes/lines when present,
+exactly ten questions, contacts, instruction-like content, symlinks, paths, and
+permissions before atomic publication. Confirm final `suggestions.md` embeds
+the deterministic report body before `## 个性化建议增强`, keeps the original
+report-version footer as its final line, and does not expose the generator or a
+success-mode banner. The three deterministic JSON files and batch summary must
+remain byte-identical. Deterministic Markdown stays in private staging; its
+source hashes remain auditable in the manifest without publishing duplicate
+human-readable files.
+
 ## Calibration
 
 `calibrate-security-scoring` consumes private canonical files and two blinded
@@ -262,8 +329,9 @@ the release calibration status requires a separately reviewed product change.
 
 ## Final response
 
-Report the scoring profile, run root, raw file count, unique candidate count,
-successful and failed counts, deduplicated source count, and conflict count.
+Report the scoring profile, complete run root, raw file count, unique candidate
+count, deterministic successful/failed counts, deduplicated source count,
+conflict count, and LLM/fallback counts from `guidance_manifest.json`.
 Do not echo candidate names, contacts, resume text, or private output contents
 in chat.
 
