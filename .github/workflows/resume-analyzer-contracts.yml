@@ -1,0 +1,81 @@
+name: Resume Analyzer Public Contracts
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/**resume-analyzer*.yml"
+      - ".gitignore"
+      - "AGENTS.md"
+      - "CLAUDE.md"
+      - "README.md"
+      - "contracts/**"
+      - "tools/**"
+      - "sre-resume-analyzer/**"
+      - "security-resume-analyzer/**"
+      - "development-resume-analyzer/**"
+  push:
+    paths:
+      - ".github/workflows/**resume-analyzer*.yml"
+      - ".gitignore"
+      - "AGENTS.md"
+      - "CLAUDE.md"
+      - "README.md"
+      - "contracts/**"
+      - "tools/**"
+      - "sre-resume-analyzer/**"
+      - "security-resume-analyzer/**"
+      - "development-resume-analyzer/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  public-contract:
+    name: Shared skill and CLI contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install the pinned Python
+        run: uv python install 3.13.13
+
+      - name: Check out pinned OpenAI skill validator
+        uses: actions/checkout@v4
+        with:
+          repository: openai/skills
+          ref: 49f948faa9258a0c61caceaf225e179651397431
+          path: .ci/openai-skills
+
+      - name: Validate all Skill frontmatter
+        shell: bash
+        run: |
+          for skill_dir in \
+            sre-resume-analyzer \
+            security-resume-analyzer \
+            development-resume-analyzer
+          do
+            uv run \
+              --isolated \
+              --no-project \
+              --python 3.13.13 \
+              --with 'PyYAML>=6,<7' \
+              python \
+              .ci/openai-skills/skills/.system/skill-creator/scripts/quick_validate.py \
+              "$skill_dir"
+          done
+
+      - name: Check synchronized public contracts
+        run: uv run --isolated --no-project --python 3.13.13 python tools/check_resume_analyzer_contracts.py
+
+      - name: Check local Markdown links
+        run: uv run --isolated --no-project --python 3.13.13 python tools/check_markdown_links.py
+
+      - name: Check installed CLI help surfaces
+        run: >-
+          uv run --isolated --no-project --python 3.13.13 python
+          tools/check_resume_analyzer_contracts.py --check-cli-help

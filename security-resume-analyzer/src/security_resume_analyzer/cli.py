@@ -40,6 +40,11 @@ def analyze_main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("--extracted", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument(
+        "--raw-extraction",
+        type=Path,
+        help="raw_extraction.json used to audit source/canonical grounding",
+    )
     parser.add_argument("--include-contact", action="store_true")
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--seed")
@@ -50,6 +55,7 @@ def analyze_main(argv: Sequence[str] | None = None) -> int:
             include_contact=args.include_contact,
             overwrite=args.overwrite,
             seed=args.seed,
+            raw_extraction_path=args.raw_extraction,
         )
     except InputValidationError as exc:
         _error("input error", exc)
@@ -81,10 +87,18 @@ def batch_main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--parallel", type=_positive, default=3)
     parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument(
+        "--raw-extraction-dir",
+        type=Path,
+        help="directory containing <canonical-stem>/raw_extraction.json audit inputs",
+    )
     args = parser.parse_args(argv)
     try:
         summary = BatchProcessor(
-            args.output_dir, max_workers=args.parallel, overwrite=args.overwrite
+            args.output_dir,
+            max_workers=args.parallel,
+            overwrite=args.overwrite,
+            raw_extraction_dir=args.raw_extraction_dir,
         ).process_directory(args.input_dir)
     except InputValidationError as exc:
         _error("input error", exc)

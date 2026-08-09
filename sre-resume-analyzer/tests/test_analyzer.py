@@ -35,6 +35,10 @@ def test_empty_input_completes_with_warnings_and_safe_fallback(tmp_path: Path):
     assert score["scoring_profile"] == "cn-campus-sre"
     assert score["output_name"] == Path(outputs["score"]).parent.name
     assert score["total_score"] == 1.0
+    assert score["deduplication"]["source_record_count"] == 1
+    assert score["deduplication"]["unique_source_count"] == 1
+    assert score["deduplication"]["source_identity_kind"] == "canonical_json_sha256"
+    assert score["source_mapping_audits"] == []
     assert score["data_quality_warnings"] == analysis["data_quality_warnings"]
     assert extracted["basic_info"]["school"] is None
     assert "data_quality_warnings" not in extracted

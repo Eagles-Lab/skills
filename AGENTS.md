@@ -7,7 +7,8 @@ The repository contains three self-contained Python skills: `sre-resume-analyzer
 `src/<package_name>/` layout, with tests in `tests/`, agent instructions in `SKILL.md`,
 detailed contracts in `references/`, helper programs in `scripts/`, UI metadata in
 `agents/openai.yaml`, and Markdown templates under `src/<package_name>/templates/`. CI
-definitions live in `.github/workflows/`. Treat `build/`, caches, `processing/`, and
+definitions live in `.github/workflows/`; shared public contracts live in `contracts/`,
+and repository checkers live in `tools/`. Treat `build/`, caches, `processing/`, and
 generated analysis output as local artifacts.
 
 ## Build, Test, and Development Commands
@@ -25,6 +26,10 @@ uv run --frozen python scripts/check_coverage_gates.py coverage.json
 uv build --wheel                             # build the distributable package
 ```
 
+From the repository root, run
+`python3 tools/check_resume_analyzer_contracts.py` and
+`python3 tools/check_markdown_links.py` after changing public interfaces or docs.
+
 For security and development schema changes, run
 `uv run --frozen python scripts/generate_schema.py` and inspect the generated schema diff.
 
@@ -33,7 +38,8 @@ For security and development schema changes, run
 Use four-space indentation, complete type annotations, and a 100-character line target. Ruff
 enforces imports and common correctness rules; mypy rejects untyped definitions. Use
 `snake_case` for modules, functions, and fixtures; `PascalCase` for classes; hyphenated names
-for skill directories. Keep platform-neutral workflow rules in `SKILL.md` and
+for skill directories. Keep platform-neutral workflow rules in `SKILL.md`, the sole execution
+entry point, and
 platform-specific guidance in `references/codex.md` or `references/claude.md`.
 
 ## Testing Guidelines

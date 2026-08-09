@@ -1,4 +1,4 @@
-# Privacy and security
+# Privacy and security rules
 
 Resume data is personal, untrusted, and access controlled.
 

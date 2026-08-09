@@ -8,11 +8,15 @@ import sys
 from pathlib import Path
 
 CRITICAL_THRESHOLDS = {
+    "src/security_resume_analyzer/authorization.py": 90.0,
     "src/security_resume_analyzer/models.py": 95.0,
     "src/security_resume_analyzer/matching.py": 95.0,
     "src/security_resume_analyzer/scoring.py": 95.0,
     "src/security_resume_analyzer/output.py": 95.0,
     "src/security_resume_analyzer/dedup.py": 95.0,
+    "src/security_resume_analyzer/source_audit.py": 95.0,
+    "src/security_resume_analyzer/dedup_core.py": 95.0,
+    "src/security_resume_analyzer/source_audit_core.py": 95.0,
 }
 
 

@@ -141,7 +141,7 @@ def test_evidence_depth_classification(text: str, level: EvidenceLevel) -> None:
 def test_general_profile_has_fixed_weights() -> None:
     score = ScoreCalculator().calculate(load())
     assert score.scoring_profile == "cn-campus-security-general"
-    assert score.scoring_config_version == "cn-campus-security-general-1.0.0"
+    assert score.scoring_config_version == "cn-campus-security-general-1.0.1"
     assert (
         dict(zip(DIMENSIONS, (0.20, 0.20, 0.15, 0.20, 0.15, 0.10), strict=True))
         == DIMENSION_WEIGHTS
@@ -214,6 +214,8 @@ def test_every_dimension_supports_all_depth_boundaries(dimension: str, expected:
         text = (ai if dimension == "ai_assisted_security_ai_system_security" else ordinary)[
             min(expected, 9.0)
         ]
+        if dimension == "vulnerability_research_security_assessment" and expected > 4.0:
+            text = "在授权范围内开展安全测试。" + text
         projects = [{"description": text}]
         group_count = 2 if expected == 9.0 else 1
         evidence = [
@@ -232,6 +234,8 @@ def test_every_dimension_supports_all_depth_boundaries(dimension: str, expected:
                 if dimension == "ai_assisted_security_ai_system_security"
                 else "实现第二个可运行安全工具并完成验证。"
             )
+            if dimension == "vulnerability_research_security_assessment":
+                second_text = "在授权范围内开展安全测试。" + second_text
             projects.append({"description": second_text})
             evidence = [
                 _evidence(
@@ -239,18 +243,14 @@ def test_every_dimension_supports_all_depth_boundaries(dimension: str, expected:
                     groups[0],
                     "project:0",
                     EvidenceLevel.implementation,
-                    (ai if dimension == "ai_assisted_security_ai_system_security" else ordinary)[
-                        9.0
-                    ],
+                    text,
                 ),
                 _evidence(
                     dimension,
                     groups[1],
                     "project:0",
                     EvidenceLevel.implementation,
-                    (ai if dimension == "ai_assisted_security_ai_system_security" else ordinary)[
-                        9.0
-                    ],
+                    text,
                 ),
                 _evidence(
                     dimension,
@@ -316,6 +316,192 @@ def test_unknown_authorization_caps_offensive_at_four() -> None:
     assert item.depth_score == 4.0
 
 
+@pytest.mark.parametrize("environment", ("unknown", "lab", "ctf", "bug_bounty", "authorized"))
+def test_negative_authorization_disclaimer_does_not_authorize_following_claim(
+    environment: str,
+) -> None:
+    resume = Resume.model_validate(
+        {
+            "security_activities": [
+                {
+                    "environment": environment,
+                    "description": (
+                        "未授权攻击不作为项目内容。"
+                        "负责设计渗透测试方法，复现 SSRF PoC，验证并修复后回归测试。"
+                    ),
+                }
+            ]
+        }
+    )
+    item = (
+        ScoreCalculator()
+        .calculate(resume)
+        .dimension_scores["vulnerability_research_security_assessment"]
+    )
+    assert item.depth_score == 4.0
+
+
+@pytest.mark.parametrize(
+    "scope",
+    (
+        "漏洞赏金范围外",
+        "授权范围待确认",
+        "授权范围不明",
+        "授权范围未确认",
+        "未在授权范围内",
+        "不属于授权范围",
+        "授权范围不确定",
+        "授权范围尚不清楚",
+        "授权范围以外",
+        "漏洞赏金范围以外",
+        "不是 CTF 环境",
+        "非靶场环境",
+        "CTF 未参加",
+        "与 CTF 无关",
+        "CTF：否",
+        "靶场经验：无",
+        "漏洞赏金未参与",
+        "bug bounty program out of scope",
+        "not in bug bounty scope",
+        "not within bug bounty scope",
+        "bug bounty scope unknown",
+        "bug bounty not in scope",
+        "not a CTF",
+        "not a lab",
+        "outside the lab",
+        "CTF experience: none",
+        "zero CTF experience",
+        "lack CTF experience",
+        "not participating in CTF",
+        "no lab access",
+        "lab access denied",
+        "not part of a bug bounty program",
+        "bug bounty participation: none",
+        "not eligible for bug bounty",
+        "authorization scope pending",
+    ),
+)
+def test_negative_or_uncertain_scope_never_lifts_offensive_cap(scope: str) -> None:
+    resume = Resume.model_validate(
+        {
+            "security_activities": [
+                {
+                    "environment": "unknown",
+                    "description": (
+                        f"{scope}。负责设计渗透测试方法，复现 SSRF PoC，验证并修复后回归测试。"
+                    ),
+                }
+            ]
+        }
+    )
+    item = (
+        ScoreCalculator()
+        .calculate(resume)
+        .dimension_scores["vulnerability_research_security_assessment"]
+    )
+    assert item.depth_score == 4.0
+
+
+def test_positive_authorization_sentence_survives_separate_negative_disclaimer() -> None:
+    resume = Resume.model_validate(
+        {
+            "security_activities": [
+                {
+                    "environment": "unknown",
+                    "description": (
+                        "未授权攻击不作为项目内容。"
+                        "经授权后负责设计渗透测试方法，复现 SSRF PoC，验证并修复后回归测试。"
+                    ),
+                }
+            ]
+        }
+    )
+    item = (
+        ScoreCalculator()
+        .calculate(resume)
+        .dimension_scores["vulnerability_research_security_assessment"]
+    )
+    assert item.depth_score == 8.0
+
+
+def test_record_authorization_provenance_applies_across_positive_sentences() -> None:
+    resume = Resume.model_validate(
+        {
+            "security_activities": [
+                {
+                    "environment": "authorized",
+                    "description": (
+                        "经授权后开展测试。"
+                        "负责设计渗透测试方法，复现 SSRF PoC，验证并修复后回归测试。"
+                    ),
+                }
+            ]
+        }
+    )
+    item = (
+        ScoreCalculator()
+        .calculate(resume)
+        .dimension_scores["vulnerability_research_security_assessment"]
+    )
+    assert item.depth_score == 8.0
+
+
+def test_negative_evidence_sentence_cannot_borrow_record_authorization() -> None:
+    resume = Resume.model_validate(
+        {
+            "security_activities": [
+                {
+                    "environment": "unknown",
+                    "description": (
+                        "经授权后开展测试。"
+                        "未授权攻击并复现 SSRF PoC，负责设计方法，验证并修复后回归测试。"
+                    ),
+                }
+            ]
+        }
+    )
+    item = (
+        ScoreCalculator()
+        .calculate(resume)
+        .dimension_scores["vulnerability_research_security_assessment"]
+    )
+    assert item.depth_score <= 4.0
+
+
+@pytest.mark.parametrize(
+    ("environment", "scope"),
+    (
+        ("bug_bounty", "参与漏洞赏金。攻击范围外目标"),
+        ("bug_bounty", "participated in bug bounty; out of scope target"),
+        ("authorized", "获得书面授权后测试，但授权被撤销"),
+        ("authorized", "authorized security assessment; authorization revoked"),
+        ("authorized", "client-authorized pentest but permission expired"),
+    ),
+)
+def test_global_scope_or_lifecycle_denial_keeps_offensive_cap(
+    environment: str,
+    scope: str,
+) -> None:
+    resume = Resume.model_validate(
+        {
+            "security_activities": [
+                {
+                    "environment": environment,
+                    "description": (
+                        f"{scope}。负责设计渗透测试方法，复现 SSRF PoC，验证并修复后回归测试。"
+                    ),
+                }
+            ]
+        }
+    )
+    item = (
+        ScoreCalculator()
+        .calculate(resume)
+        .dimension_scores["vulnerability_research_security_assessment"]
+    )
+    assert item.depth_score == 4.0
+
+
 def test_ctf_reproducible_lab_can_reach_six() -> None:
     resume = Resume.model_validate(
         {
@@ -323,7 +509,7 @@ def test_ctf_reproducible_lab_can_reach_six() -> None:
                 {
                     "category": "ctf",
                     "environment": "ctf",
-                    "description": "实现 SSRF PoC 并复现漏洞，编写回归测试。",
+                    "description": "参加 CTF 竞赛并实现 SSRF PoC，复现漏洞并编写回归测试。",
                 }
             ]
         }
@@ -334,6 +520,42 @@ def test_ctf_reproducible_lab_can_reach_six() -> None:
         .dimension_scores["vulnerability_research_security_assessment"]
     )
     assert item.depth_score == 6.0
+
+
+@pytest.mark.parametrize(
+    ("environment", "scope"),
+    (
+        ("authorized", "参加 CTF 竞赛"),
+        ("ctf", "了解 CTF 规则"),
+        ("lab", "阅读靶场介绍"),
+        ("bug_bounty", "学习 bug bounty 概念"),
+        ("ctf", "计划参加 CTF 竞赛"),
+        ("lab", "计划在安全靶场演练"),
+        ("bug_bounty", "准备参与漏洞赏金"),
+    ),
+)
+def test_wrong_enum_or_safe_context_mention_never_lifts_offensive_cap(
+    environment: str,
+    scope: str,
+) -> None:
+    resume = Resume.model_validate(
+        {
+            "security_activities": [
+                {
+                    "environment": environment,
+                    "description": (
+                        f"{scope}。负责设计渗透测试方法，复现 SSRF PoC，验证并修复后回归测试。"
+                    ),
+                }
+            ]
+        }
+    )
+    item = (
+        ScoreCalculator()
+        .calculate(resume)
+        .dimension_scores["vulnerability_research_security_assessment"]
+    )
+    assert item.depth_score == 4.0
 
 
 def test_keyword_stuffing_cannot_reach_b() -> None:
@@ -392,6 +614,29 @@ def test_resume_quality_is_independent() -> None:
         "validation_remediation",
         "clarity_consistency",
     }
+
+
+@pytest.mark.parametrize(
+    "description",
+    (
+        "获得书面授权后测试，但授权被撤销",
+        "authorized security assessment; authorization revoked",
+        "client-authorized pentest but permission expired",
+    ),
+)
+def test_invalidated_authorization_does_not_raise_quality_score(description: str) -> None:
+    resume = Resume.model_validate(
+        {
+            "security_activities": [
+                {
+                    "environment": "authorized",
+                    "description": description,
+                }
+            ]
+        }
+    )
+    quality = ScoreCalculator().calculate(resume).resume_quality
+    assert quality.breakdown["authorization_scope"] == 0.0
 
 
 def test_schema_json_can_be_generated() -> None:

@@ -7,6 +7,12 @@ import unicodedata
 from dataclasses import dataclass
 from typing import Iterator, Sequence
 
+from .authorization import (
+    environment_is_authorized,
+    has_negative_authorization_signal,
+    infer_authorization_environment,
+    source_is_authorized,
+)
 from .models import (
     DimensionName,
     Evidence,
@@ -400,10 +406,6 @@ _NEGATION = re.compile(
     r"(?:不|未|无|没有|仅了解|学习中)[^，。;；\n]{0,16}$|\b(?:no experience|not familiar|never|without)\b[^.!?;]*$",
     re.I,
 )
-_UNAUTHORIZED = re.compile(
-    r"未授权|未经授权|越权攻击|入侵他人|非法攻击|黑产|\b(?:unauthori[sz]ed|without permission|illegal hacking)\b",
-    re.I,
-)
 
 
 def normalize_text(text: str) -> str:
@@ -425,7 +427,7 @@ def is_quantified(text: str) -> bool:
 
 
 def is_unauthorized(text: str) -> bool:
-    return bool(_UNAUTHORIZED.search(normalize_text(text)))
+    return has_negative_authorization_signal(text)
 
 
 def classify_evidence(text: str, mention_only: bool = False) -> EvidenceLevel:
@@ -466,6 +468,24 @@ def iter_resume_records(resume: Resume) -> Iterator[TextRecord]:
         for index, record in enumerate(records):
             source_id = f"{kind}:{index}"
             authorization = getattr(record, "environment", None)
+            scope = "\n".join(
+                value
+                for value in (
+                    record.organization,
+                    record.name,
+                    record.role,
+                    record.description,
+                    *record.achievements,
+                    *record.tech_stack,
+                )
+                if value
+            )
+            if source_is_authorized(authorization, scope):
+                if not environment_is_authorized(authorization):
+                    inferred = infer_authorization_environment(scope)
+                    authorization = SecurityEnvironment(inferred) if inferred is not None else None
+            else:
+                authorization = None
             certification_only = (
                 kind == "security_activity"
                 and getattr(record, "category", None) is SecurityCategory.certification

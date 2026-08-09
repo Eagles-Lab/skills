@@ -1,0 +1,249 @@
+{
+  "same_candidate": [
+    {
+      "id": "email_normalization",
+      "left": {"basic_info": {"contact": {"email": "A@EXAMPLE.TEST"}}},
+      "right": {"basic_info": {"contact": {"email": "a@example.test"}}},
+      "expected": true
+    },
+    {
+      "id": "invalid_email_consecutive_domain_dot_blocks_fallback",
+      "left": {
+        "basic_info": {
+          "name": "候选甲", "school": "示例大学", "major": "计算机",
+          "graduation_year": 2027, "contact": {"email": "a@b..com"}
+        }
+      },
+      "right": {
+        "basic_info": {
+          "name": "候选甲", "school": "示例大学", "major": "计算机",
+          "graduation_year": 2027, "contact": {"email": "a@b..com"}
+        }
+      },
+      "expected": false
+    },
+    {
+      "id": "invalid_email_local_edge_dot_blocks_fallback",
+      "left": {
+        "basic_info": {
+          "name": "候选甲", "school": "示例大学", "major": "计算机",
+          "graduation_year": 2027, "contact": {"email": ".a@example.com"}
+        }
+      },
+      "right": {
+        "basic_info": {
+          "name": "候选甲", "school": "示例大学", "major": "计算机",
+          "graduation_year": 2027, "contact": {"email": "a.@example.com"}
+        }
+      },
+      "expected": false
+    },
+    {
+      "id": "invalid_email_domain_hyphen_blocks_fallback",
+      "left": {
+        "basic_info": {
+          "name": "候选甲", "school": "示例大学", "major": "计算机",
+          "graduation_year": 2027, "contact": {"email": "a@example-.com"}
+        }
+      },
+      "right": {
+        "basic_info": {
+          "name": "候选甲", "school": "示例大学", "major": "计算机",
+          "graduation_year": 2027, "contact": {"email": "a@-example.com"}
+        }
+      },
+      "expected": false
+    },
+    {
+      "id": "invalid_email_numeric_tld_blocks_fallback",
+      "left": {
+        "basic_info": {
+          "name": "候选甲", "school": "示例大学", "major": "计算机",
+          "graduation_year": 2027, "contact": {"email": "a@example.123"}
+        }
+      },
+      "right": {
+        "basic_info": {
+          "name": "候选甲", "school": "示例大学", "major": "计算机",
+          "graduation_year": 2027, "contact": {"email": "a@example.123"}
+        }
+      },
+      "expected": false
+    },
+    {
+      "id": "phone_normalization",
+      "left": {"basic_info": {"contact": {"phone": "+86 138-0000-0000"}}},
+      "right": {"basic_info": {"contact": {"phone": "13800000000"}}},
+      "expected": true
+    },
+    {
+      "id": "phone_extension_is_not_identity",
+      "left": {"basic_info": {"contact": {"phone": "13800000000 ext 123"}}},
+      "right": {"basic_info": {"contact": {"phone": "13800000000"}}},
+      "expected": true
+    },
+    {
+      "id": "different_country_codes_do_not_merge",
+      "left": {"basic_info": {"contact": {"phone": "+1 386 138 0000"}}},
+      "right": {"basic_info": {"contact": {"phone": "+86 13861380000"}}},
+      "expected": false
+    },
+    {
+      "id": "uk_country_code_does_not_merge_with_local_number",
+      "left": {"basic_info": {"contact": {"phone": "+44 13861380000"}}},
+      "right": {"basic_info": {"contact": {"phone": "13861380000"}}},
+      "expected": false
+    },
+    {
+      "id": "invalid_phone_blocks_metadata_fallback",
+      "left": {
+        "basic_info": {
+          "name": "候选甲",
+          "school": "示例大学",
+          "major": "计算机",
+          "graduation_year": 2027,
+          "contact": {"phone": "123456"}
+        }
+      },
+      "right": {
+        "basic_info": {
+          "name": "候选甲",
+          "school": "示例大学",
+          "major": "计算机",
+          "graduation_year": 2027
+        }
+      },
+      "expected": false
+    },
+    {
+      "id": "ambiguous_bare_local_phone_is_not_identity",
+      "left": {
+        "basic_info": {
+          "name": "候选甲",
+          "school": "示例大学",
+          "major": "计算机",
+          "graduation_year": 2027,
+          "contact": {"phone": "12345678"}
+        }
+      },
+      "right": {
+        "basic_info": {
+          "name": "候选甲",
+          "school": "示例大学",
+          "major": "计算机",
+          "graduation_year": 2027,
+          "contact": {"phone": "12345678"}
+        }
+      },
+      "expected": false
+    },
+    {
+      "id": "invalid_placeholder_email_is_not_identity",
+      "left": {"basic_info": {"name": "候选甲", "contact": {"email": "N/A"}}},
+      "right": {"basic_info": {"name": "候选乙", "contact": {"email": "N/A"}}},
+      "expected": false
+    },
+    {
+      "id": "placeholder_phone_is_not_identity",
+      "left": {"basic_info": {"name": "候选甲", "contact": {"phone": "00000000000"}}},
+      "right": {"basic_info": {"name": "候选乙", "contact": {"phone": "00000000000"}}},
+      "expected": false
+    },
+    {
+      "id": "metadata_and_substantive_similarity_without_contacts",
+      "left": {
+        "basic_info": {
+          "name": "候选甲",
+          "school": "示例大学",
+          "major": "计算机",
+          "graduation_year": 2027
+        },
+        "projects": [{
+          "name": "监控平台", "role": "负责人", "duration": "2025",
+          "description": "使用 Python 构建监控服务", "tech_stack": ["Python"]
+        }]
+      },
+      "right": {
+        "basic_info": {
+          "name": "候选甲",
+          "school": "示例大学",
+          "major": "计算机",
+          "graduation_year": 2027
+        },
+        "projects": [{
+          "name": "监控平台", "role": "负责人", "duration": "2025",
+          "description": "使用 Python 构建监控服务并测试", "tech_stack": ["Python"]
+        }]
+      },
+      "expected": true
+    },
+    {
+      "id": "metadata_only_has_no_similarity_evidence",
+      "left": {
+        "basic_info": {
+          "name": "候选甲", "school": "示例大学", "major": "计算机",
+          "graduation_year": 2027
+        }
+      },
+      "right": {
+        "basic_info": {
+          "name": "候选甲", "school": "示例大学", "major": "计算机",
+          "graduation_year": 2027
+        }
+      },
+      "expected": false
+    },
+    {
+      "id": "same_metadata_different_experiences_do_not_merge",
+      "left": {
+        "basic_info": {
+          "name": "候选甲", "school": "示例大学", "major": "计算机",
+          "graduation_year": 2027
+        },
+        "projects": [{
+          "name": "商城", "role": "后端", "description": "使用 Python 开发后端服务",
+          "tech_stack": ["Python"]
+        }]
+      },
+      "right": {
+        "basic_info": {
+          "name": "候选甲", "school": "示例大学", "major": "计算机",
+          "graduation_year": 2027
+        },
+        "projects": [{
+          "name": "游戏", "role": "客户端", "description": "使用 Go 开发客户端",
+          "tech_stack": ["Go"]
+        }]
+      },
+      "expected": false
+    },
+    {
+      "id": "name_only_is_insufficient",
+      "left": {"basic_info": {"name": "同名候选人"}},
+      "right": {"basic_info": {"name": "同名候选人"}},
+      "expected": false
+    },
+    {
+      "id": "different_contacts_block_metadata_fallback",
+      "left": {
+        "basic_info": {
+          "name": "候选乙",
+          "school": "示例大学",
+          "major": "计算机",
+          "graduation_year": 2027,
+          "contact": {"email": "left@example.test"}
+        }
+      },
+      "right": {
+        "basic_info": {
+          "name": "候选乙",
+          "school": "示例大学",
+          "major": "计算机",
+          "graduation_year": 2027,
+          "contact": {"email": "right@example.test"}
+        }
+      },
+      "expected": false
+    }
+  ]
+}

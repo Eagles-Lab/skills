@@ -13,6 +13,8 @@ CRITICAL_THRESHOLDS = {
     "src/sre_resume_analyzer/scoring.py": 95.0,
     "src/sre_resume_analyzer/output.py": 95.0,
     "src/sre_resume_analyzer/source_audit.py": 95.0,
+    "src/sre_resume_analyzer/dedup_core.py": 95.0,
+    "src/sre_resume_analyzer/source_audit_core.py": 95.0,
 }
 
 

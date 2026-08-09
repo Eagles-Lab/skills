@@ -6,6 +6,11 @@ import re
 from collections import defaultdict
 from typing import Sequence
 
+from .authorization import (
+    environment_is_authorized,
+    has_negative_authorization_signal,
+    has_positive_authorization_signal,
+)
 from .matching import (
     DIMENSION_CONCEPTS,
     EvidenceMatcher,
@@ -22,7 +27,6 @@ from .models import (
     Resume,
     ResumeQualityDiagnostic,
     ScoreResult,
-    SecurityEnvironment,
 )
 from .security import is_instruction_like
 
@@ -63,10 +67,6 @@ _CLOSURE = re.compile(
 _OWN = re.compile(r"负责|主导|设计|独立|\b(?:owned?|led|lead|designed?)\b", re.I)
 _REAL = re.compile(
     r"生产|线上|真实业务|用户|客户|赏金|披露|应急|\b(?:production|real[- ]world|customer|bounty|disclos|incident)\b",
-    re.I,
-)
-_AUTHORIZED = re.compile(
-    r"授权|许可范围|比赛环境|靶场|实验环境|漏洞赏金|\b(?:authori[sz]ed|permission|scope|ctf|lab|bug bounty)\b",
     re.I,
 )
 _AI_WORKFLOW = re.compile(
@@ -218,11 +218,8 @@ class ScoreCalculator:
             sum(bool(_OWN.search(text)) for text in texts) >= 2,
         )
         authorization = _two_point(
-            any(_AUTHORIZED.search(text) for text in texts),
-            any(
-                getattr(item, "environment", None) not in (None, SecurityEnvironment.unknown)
-                for item in resume.security_activities
-            ),
+            any(has_positive_authorization_signal(text) for text in texts),
+            any(environment_is_authorized(item.authorization) for item in applied_records),
         )
         methodology = _two_point(
             any(_METHOD.search(text) for text in texts),
@@ -260,15 +257,13 @@ class ScoreCalculator:
 
 
 def _authorized_source(evidence: Sequence[Evidence], text: str) -> bool:
-    allowed = {
-        SecurityEnvironment.lab,
-        SecurityEnvironment.ctf,
-        SecurityEnvironment.bug_bounty,
-        SecurityEnvironment.authorized,
-        SecurityEnvironment.academic,
-        SecurityEnvironment.open_source,
-    }
-    return any(item.authorization in allowed for item in evidence) or bool(_AUTHORIZED.search(text))
+    del text
+    return any(
+        item.authorization is not None
+        and environment_is_authorized(item.authorization)
+        and not has_negative_authorization_signal(item.context)
+        for item in evidence
+    )
 
 
 def _ai_source_score(evidence: Sequence[Evidence], text: str) -> float:
@@ -302,7 +297,9 @@ def _source_texts(resume: Resume) -> dict[str, str]:
     grouped: dict[str, list[str]] = defaultdict(list)
     for record in iter_resume_records(resume):
         for sentence, _ in iter_sentences(record.text):
-            if not is_instruction_like(sentence):
+            if not is_instruction_like(sentence) and not has_negative_authorization_signal(
+                sentence
+            ):
                 grouped[record.source_id].append(sentence)
     return {key: " ".join(values) for key, values in grouped.items()}
 

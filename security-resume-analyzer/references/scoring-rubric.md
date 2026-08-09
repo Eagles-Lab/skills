@@ -1,8 +1,8 @@
 # General campus-security scoring rubric
 
-The single scoring profile is `cn-campus-security-general`. It is designed for
-Chinese security internships and campus hiring; it does not select or infer a
-job track.
+The single scoring profile is `cn-campus-security-general`, configuration
+version `cn-campus-security-general-1.0.1`. It is designed for Chinese security
+internships and campus hiring; it does not select or infer a job track.
 
 The product taxonomy is informed by the [NIST NICE Framework
 2.2.0](https://www.nist.gov/itl/applied-cybersecurity/nice/nice-framework-resource-center/nice-framework-current-versions),
@@ -41,6 +41,17 @@ framework mapping, hiring conclusion, or calibrated model.
 
 Resume quality has weight zero. It diagnoses personal contribution,
 authorization, method, verification/remediation, and internal consistency.
+
+Administrative proximity is not authorization: managing or visiting a lab,
+using its equipment or rooms, CTF registration/judging/photography, and
+bug-bounty operations do not lift the offensive-evidence cap. Forged, fake,
+invalid, not-yet-effective, expired, revoked, unclear-scope, or target-excluded
+authorization denies the whole record even when an earlier statement is
+positive.
+Treat a discovered authorization-control or scope vulnerability as a tested
+system defect, not as evidence that the candidate lacked testing permission.
+Generic issue/risk wording, or continued testing after noticing unclear
+permission, does not qualify for that finding exception.
 
 All outputs declare `calibration_status: not_calibrated`. The overall letter
 grade is a compact evidence-coverage label only and must not rank candidates.

@@ -1,30 +1,32 @@
-"""Deterministic, isolated batch processing with one atomic run publication."""
+"""Deterministic source-aware batch processing with atomic run publication."""
 
 from __future__ import annotations
 
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, Optional
 
 from .analyzer import AnalysisArtifacts, ResumeAnalyzer, load_resume
-from .errors import InputValidationError, OutputConflictError, OutputSafetyError
-from .output import (
-    derive_output_name,
-    derive_resume_id,
-    sha256_file,
-    validate_resume_id,
-    write_run_output,
+from .dedup import IdentityConflictError, MergedCandidate, SourceRecord, merge_candidates
+from .dedup_core import SourceIdentityKind
+from .errors import (
+    InputValidationError,
+    OutputConflictError,
+    OutputSafetyError,
+    SourceMappingAuditError,
 )
+from .models import SCORING_PROFILE
+from .output import sha256_file, write_run_output
 from .source_audit import audit_source_mapping
+from .source_audit_core import load_raw_extraction
 
 
 class BatchPreflightError(InputValidationError):
-    """The batch cannot start without ambiguous or destructive output."""
+    """The batch cannot safely enumerate or identify its inputs."""
 
 
 AnalyzerFactory = Callable[[Path], ResumeAnalyzer]
-PreflightItem = Tuple[Path, str, str, str, Optional[Path]]
 
 
 def _utc_now() -> datetime:
@@ -32,7 +34,7 @@ def _utc_now() -> datetime:
 
 
 class BatchProcessor:
-    """Process canonical JSON files without retaining state between calls."""
+    """Audit, identify, merge, score, and publish one isolated batch."""
 
     def __init__(
         self,
@@ -62,8 +64,8 @@ class BatchProcessor:
         pattern: str = "*.json",
     ) -> Dict[str, Any]:
         source_dir = Path(input_dir)
-        if not source_dir.exists() or not source_dir.is_dir():
-            raise BatchPreflightError(f"input directory does not exist: {source_dir}")
+        if not source_dir.exists() or not source_dir.is_dir() or source_dir.is_symlink():
+            raise BatchPreflightError("input directory must be a real directory")
         if self.output_dir.is_symlink():
             raise OutputSafetyError("refusing to replace an output symlink")
         if self.output_dir.exists() and not self.overwrite:
@@ -73,55 +75,98 @@ class BatchProcessor:
             or not self.raw_extraction_dir.is_dir()
             or self.raw_extraction_dir.is_symlink()
         ):
-            raise BatchPreflightError(
-                "raw extraction directory must be an existing regular directory"
-            )
+            raise BatchPreflightError("raw extraction directory must be a real directory")
 
-        input_files = sorted(
-            (path for path in source_dir.glob(pattern) if path.is_file()),
-            key=lambda path: path.as_posix(),
+        identity_kind: SourceIdentityKind = (
+            "raw_document_sha256"
+            if self.raw_extraction_dir is not None
+            else "canonical_json_sha256"
         )
-        valid, failures = self._preflight(input_files)
-        artifacts: List[AnalysisArtifacts] = []
-        results: List[Dict[str, Any]] = list(failures)
+        input_files = sorted(source_dir.glob(pattern), key=lambda path: path.as_posix())
+        sources: list[SourceRecord] = []
+        failures: list[dict[str, Any]] = []
+        for path in input_files:
+            if path.is_symlink() or not path.is_file():
+                failures.append(_input_failure([], "UnsafeInputEntry"))
+                continue
+            canonical_digest = sha256_file(path)
+            failure_hashes = [canonical_digest] if identity_kind == "canonical_json_sha256" else []
+            try:
+                resume = load_resume(path)
+                source_digest = canonical_digest
+                audit_metadata = None
+                if self.raw_extraction_dir is not None:
+                    raw_path = self._raw_extraction_path(path.stem)
+                    raw = load_raw_extraction(raw_path, SourceMappingAuditError)
+                    failure_hashes = [raw.source_sha256]
+                    audit = audit_source_mapping(raw_path, resume)
+                    source_digest = audit.raw_source_sha256
+                    audit_metadata = audit.public_metadata()
+                sources.append(
+                    SourceRecord(
+                        path=path,
+                        canonical_sha256=canonical_digest,
+                        source_sha256=source_digest,
+                        source_identity_kind=identity_kind,
+                        resume=resume,
+                        audit_metadata=audit_metadata,
+                    )
+                )
+            except Exception as exc:
+                failures.append(_input_failure(failure_hashes, type(exc).__name__))
 
+        candidates, identity_failures = merge_candidates(sources)
+        failures.extend(_identity_failure(value) for value in identity_failures)
+        artifacts: list[AnalysisArtifacts] = []
+        results: list[dict[str, Any]] = list(failures)
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            futures: Dict[Future[AnalysisArtifacts], PreflightItem] = {
-                executor.submit(self._process_one, item): item for item in valid
+            futures: dict[Future[AnalysisArtifacts], MergedCandidate] = {
+                executor.submit(self._process_one, item): item for item in candidates
             }
             for future in as_completed(futures):
-                _path, resume_id, output_name, digest, _raw_path = futures[future]
+                candidate = futures[future]
                 try:
                     artifact = future.result()
-                    if artifact.resume_id != resume_id or artifact.output_name != output_name:
-                        raise RuntimeError("preflight identity changed during analysis")
+                    if artifact.output_name != candidate.output_name:
+                        raise RuntimeError("candidate identity changed during analysis")
                     artifacts.append(artifact)
-                    score = artifact.score
-                    grade = score.get("grade", {})
+                    grade = artifact.score.get("grade", {})
                     results.append(
                         {
-                            "input_sha256": digest,
-                            "resume_id": resume_id,
-                            "output_name": output_name,
+                            "source_hashes": list(candidate.source_hashes),
                             "status": "success",
-                            "total_score": score.get("total_score", 1.0),
+                            "output_name": artifact.output_name,
+                            "total_score": artifact.score.get("total_score", 1.0),
                             "grade": grade.get("grade", "F"),
                             "data_quality_warning_count": len(
-                                score.get("data_quality_warnings", [])
+                                artifact.score.get("data_quality_warnings", [])
                             ),
                         }
                     )
                 except Exception as exc:
                     results.append(
                         {
-                            "input_sha256": digest,
+                            "source_hashes": list(candidate.source_hashes),
                             "status": "failed",
                             "error_category": type(exc).__name__,
                         }
                     )
 
-        results.sort(key=lambda item: (str(item.get("input_sha256", "")), item["status"]))
-        summary = self._summary(results)
+        results.sort(key=lambda item: (item["source_hashes"], item["status"]))
+        summary = self._summary(
+            results,
+            raw_file_count=len(input_files),
+            unique_candidate_count=len(results),
+            deduplicated_source_count=sum(
+                candidate.deduplicated_source_count for candidate in candidates
+            )
+            + sum(error.deduplicated_source_count for error in identity_failures),
+            conflict_failure_count=len(identity_failures),
+            source_mapping_audit_count=sum(
+                1 for source in sources if source.audit_metadata is not None
+            ),
+            source_identity_kind=identity_kind,
+        )
         write_run_output(
             self.output_dir,
             [item.output_payload() for item in artifacts],
@@ -130,76 +175,45 @@ class BatchProcessor:
         )
         return summary
 
-    def _preflight(
-        self, input_files: List[Path]
-    ) -> Tuple[List[PreflightItem], List[Dict[str, Any]]]:
-        valid: List[PreflightItem] = []
-        failures: List[Dict[str, Any]] = []
-        output_owners: Dict[str, Path] = {}
-        digest_owners: Dict[str, Path] = {}
-        duplicate_outputs: List[str] = []
-        duplicate_digests: List[str] = []
-
-        for path in input_files:
-            digest = sha256_file(path)
-            try:
-                resume = load_resume(path)
-                raw_path = None
-                if self.raw_extraction_dir is not None:
-                    raw_path = self._raw_extraction_path(path.stem)
-                    audit_source_mapping(raw_path, resume)
-                resume_id = (
-                    validate_resume_id(resume.resume_id)
-                    if resume.resume_id is not None
-                    else derive_resume_id(resume.basic_info.name, digest)
-                )
-                output_name = derive_output_name(resume.basic_info.name, digest)
-                if output_name in output_owners:
-                    duplicate_outputs.append(output_name)
-                if digest in digest_owners:
-                    duplicate_digests.append(digest[:12])
-                if output_name not in output_owners and digest not in digest_owners:
-                    output_owners[output_name] = path
-                    digest_owners[digest] = path
-                    valid.append((path, resume_id, output_name, digest, raw_path))
-            except Exception as exc:
-                failures.append(
-                    {
-                        "input_sha256": digest,
-                        "status": "failed",
-                        "error_category": type(exc).__name__,
-                    }
-                )
-
-        if duplicate_outputs or duplicate_digests:
-            categories = []
-            if duplicate_outputs:
-                categories.append("output-name collision")
-            if duplicate_digests:
-                categories.append("duplicate input")
-            raise BatchPreflightError("batch preflight rejected: " + " and ".join(categories))
-        return valid, failures
-
     def _raw_extraction_path(self, canonical_stem: str) -> Path:
         if self.raw_extraction_dir is None:  # pragma: no cover - guarded by caller
             raise BatchPreflightError("raw extraction directory is not configured")
         root = self.raw_extraction_dir.resolve(strict=True)
-        candidate_dir = self.raw_extraction_dir / canonical_stem
-        if candidate_dir.is_symlink():
-            raise BatchPreflightError("raw extraction candidate directory must not be a symlink")
-        resolved_candidate_dir = candidate_dir.resolve(strict=False)
+        candidate = self.raw_extraction_dir / canonical_stem
         try:
-            resolved_candidate_dir.relative_to(root)
-        except ValueError as exc:
-            raise BatchPreflightError("raw extraction path escapes the configured root") from exc
-        return candidate_dir / "raw_extraction.json"
+            resolved = candidate.resolve(strict=True)
+            resolved.relative_to(root)
+        except (OSError, ValueError) as exc:
+            raise BatchPreflightError("raw extraction path is missing or unsafe") from exc
+        if candidate.is_symlink() or not resolved.is_dir():
+            raise BatchPreflightError("raw extraction candidate path must be a real directory")
+        return resolved / "raw_extraction.json"
 
-    def _process_one(self, item: PreflightItem) -> AnalysisArtifacts:
-        path, _resume_id, _output_name, _digest, raw_path = item
+    def _process_one(self, candidate: MergedCandidate) -> AnalysisArtifacts:
         analyzer = self.analyzer_factory(self.output_dir)
-        return analyzer.build_artifacts(path, raw_extraction_path=raw_path)
+        return analyzer.build_candidate_artifacts(
+            candidate.resume,
+            candidate.source_hashes,
+            output_name=candidate.output_name,
+            primary_sha256=candidate.primary_sha256,
+            primary_canonical_sha256=candidate.primary_canonical_sha256,
+            source_record_count=candidate.source_record_count,
+            source_identity_kind=candidate.source_identity_kind,
+            conflicts=candidate.conflicts,
+            source_mapping_audits=candidate.source_mapping_audits,
+        )
 
-    def _summary(self, results: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def _summary(
+        self,
+        results: list[dict[str, Any]],
+        *,
+        raw_file_count: int,
+        unique_candidate_count: int,
+        deduplicated_source_count: int,
+        conflict_failure_count: int,
+        source_mapping_audit_count: int,
+        source_identity_kind: SourceIdentityKind,
+    ) -> Dict[str, Any]:
         successful = [item for item in results if item["status"] == "success"]
         failed = len(results) - len(successful)
         scores = [float(item["total_score"]) for item in successful]
@@ -212,15 +226,37 @@ class BatchProcessor:
             warning_distribution[count] = warning_distribution.get(count, 0) + 1
         generated_at = self.clock().astimezone(UTC).replace(microsecond=0).isoformat()
         return {
+            "schema_version": "1.1",
+            "scoring_profile": SCORING_PROFILE,
             "generated_at": generated_at.replace("+00:00", "Z"),
-            "total": len(results),
+            "raw_file_count": raw_file_count,
+            "unique_candidate_count": unique_candidate_count,
             "successful": len(successful),
             "failed": failed,
+            "deduplicated_source_count": deduplicated_source_count,
+            "conflict_failure_count": conflict_failure_count,
+            "source_mapping_audit_count": source_mapping_audit_count,
+            "source_identity_kind": source_identity_kind,
+            "results": results,
+            # Additive compatibility statistics retained for existing SRE consumers.
+            "total": len(results),
             "success_rate": round(len(successful) / len(results), 4) if results else 0.0,
             "average_score": round(sum(scores) / len(scores), 1) if scores else 0.0,
             "grade_distribution": dict(sorted(grade_distribution.items())),
             "data_quality_warning_count_distribution": dict(
                 sorted(warning_distribution.items(), key=lambda pair: int(pair[0]))
             ),
-            "results": results,
         }
+
+
+def _input_failure(source_hashes: list[str], category: str) -> dict[str, Any]:
+    return {"source_hashes": source_hashes, "status": "failed", "error_category": category}
+
+
+def _identity_failure(error: IdentityConflictError) -> dict[str, Any]:
+    return {
+        "source_hashes": list(error.source_hashes),
+        "status": "failed",
+        "error_category": type(error).__name__,
+        "conflict_fields": list(error.fields),
+    }

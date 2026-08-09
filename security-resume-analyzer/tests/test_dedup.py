@@ -45,7 +45,7 @@ def person(
 
 def test_contact_normalization() -> None:
     assert normalize_email(" A@EXAMPLE.TEST ") == "a@example.test"
-    assert normalize_phone("+86 138-0000-0000") == "13800000000"
+    assert normalize_phone("+86 138-0000-0000") == "cn:13800000000"
     assert normalize_phone("123") is None
 
 

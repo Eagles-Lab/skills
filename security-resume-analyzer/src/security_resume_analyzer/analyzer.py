@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import re
 from dataclasses import dataclass
@@ -12,6 +11,7 @@ from typing import Any, Callable, Mapping
 
 from pydantic import ValidationError
 
+from .dedup_core import SourceIdentityKind, aggregate_source_sha256
 from .errors import AnalyzerError, InputValidationError, OutputSafetyError
 from .matching import unsafe_offensive_statements
 from .models import DataQualityWarning, Resume
@@ -25,6 +25,7 @@ from .output import (
 from .rendering import RenderingError, ReportRenderer
 from .scoring import ScoreCalculator
 from .security import SECURITY_WARNING, contains_instruction_like_content
+from .source_audit import audit_source_mapping
 from .version import ANALYZER_STATUS, ANALYZER_VERSION, CALIBRATION_STATUS
 
 Clock = Callable[[], datetime]
@@ -104,15 +105,21 @@ class SecurityResumeAnalyzer:
         *,
         output_name: str | None = None,
         primary_sha256: str | None = None,
+        primary_canonical_sha256: str | None = None,
+        source_record_count: int | None = None,
+        source_identity_kind: SourceIdentityKind = "canonical_json_sha256",
         conflicts: tuple[dict[str, str], ...] = (),
+        source_mapping_audits: tuple[Mapping[str, Any], ...] = (),
         include_contact: bool = False,
         seed: str | None = None,
     ) -> AnalysisArtifacts:
         if not source_hashes or any(not _SHA256.fullmatch(value) for value in source_hashes):
             raise InputValidationError("source hashes must contain SHA-256 digests")
-        source_hashes = tuple(sorted(source_hashes))
-        combined_sha256 = hashlib.sha256("".join(source_hashes).encode()).hexdigest()
+        source_hashes = tuple(sorted(set(source_hashes)))
+        combined_sha256 = aggregate_source_sha256(source_hashes)
         primary_sha256 = primary_sha256 or source_hashes[0]
+        primary_canonical_sha256 = primary_canonical_sha256 or primary_sha256
+        source_record_count = source_record_count or len(source_hashes)
         resume_id = (
             validate_resume_id(resume.resume_id)
             if resume.resume_id
@@ -125,6 +132,14 @@ class SecurityResumeAnalyzer:
         warnings = collect_data_quality_warnings(resume)
         security_warnings = unsafe_offensive_statements(resume)
         if contains_instruction_like_content(resume.model_dump(mode="python")):
+            security_warnings.append(SECURITY_WARNING)
+        if (
+            any(
+                SECURITY_WARNING in audit.get("warning_codes", ())
+                for audit in source_mapping_audits
+            )
+            and SECURITY_WARNING not in security_warnings
+        ):
             security_warnings.append(SECURITY_WARNING)
         try:
             score = self.calculator.calculate(resume).model_dump(mode="json")
@@ -139,11 +154,16 @@ class SecurityResumeAnalyzer:
                     "source_hashes": list(source_hashes),
                     "generated_at": generated_at,
                     "deduplication": {
-                        "source_count": len(source_hashes),
-                        "deduplicated_source_count": len(source_hashes) - 1,
+                        "source_count": source_record_count,
+                        "source_record_count": source_record_count,
+                        "unique_source_count": len(source_hashes),
+                        "deduplicated_source_count": source_record_count - 1,
                         "primary_sha256": primary_sha256,
+                        "primary_canonical_sha256": primary_canonical_sha256,
+                        "source_identity_kind": source_identity_kind,
                         "conflicts": list(conflicts),
                     },
+                    "source_mapping_audits": [dict(item) for item in source_mapping_audits],
                     "data_quality_warnings": [item.model_dump(mode="json") for item in warnings],
                     "security_warnings": sorted(set(security_warnings)),
                 }
@@ -161,6 +181,7 @@ class SecurityResumeAnalyzer:
                 "data_quality_warnings": score["data_quality_warnings"],
                 "security_warnings": score["security_warnings"],
                 "resume_quality": score["resume_quality"],
+                "source_mapping_audits": score["source_mapping_audits"],
                 "overall_assessment": "该结果仅衡量未校准的简历证据覆盖度，不得用于排名或招聘决策。",
             }
             rendered = self.renderer.render(
@@ -197,11 +218,29 @@ class SecurityResumeAnalyzer:
         include_contact: bool = False,
         overwrite: bool = False,
         seed: str | None = None,
+        raw_extraction_path: Path | None = None,
     ) -> dict[str, str]:
         resume = load_resume(extracted_path)
-        digest = sha256_file(extracted_path)
+        canonical_digest = sha256_file(extracted_path)
+        audits: tuple[Mapping[str, Any], ...]
+        source_identity_kind: SourceIdentityKind
+        if raw_extraction_path is not None:
+            audit = audit_source_mapping(raw_extraction_path, resume)
+            digest = audit.raw_source_sha256
+            audits = (audit.public_metadata(),)
+            source_identity_kind = "raw_document_sha256"
+        else:
+            digest = canonical_digest
+            audits = ()
+            source_identity_kind = "canonical_json_sha256"
         artifacts = self.build_artifacts(
-            resume, (digest,), include_contact=include_contact, seed=seed
+            resume,
+            (digest,),
+            include_contact=include_contact,
+            seed=seed,
+            primary_canonical_sha256=canonical_digest,
+            source_identity_kind=source_identity_kind,
+            source_mapping_audits=audits,
         )
         return write_run_output(self.output_dir, [artifacts.output_payload()], overwrite=overwrite)[
             artifacts.output_name

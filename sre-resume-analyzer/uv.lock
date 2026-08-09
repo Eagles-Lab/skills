@@ -776,7 +776,7 @@ wheels = [
 
 [[package]]
 name = "sre-resume-analyzer"
-version = "3.0.0rc2"
+version = "3.0.0rc3"
 source = { editable = "." }
 dependencies = [
     { name = "jinja2" },

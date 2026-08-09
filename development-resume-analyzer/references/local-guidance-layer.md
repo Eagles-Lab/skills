@@ -115,6 +115,11 @@ uv run --frozen python scripts/finalize_guidance.py \
 `--raw-extraction-dir`；没有任何草稿时也可省略 `--draft-dir`。只有用户明确
 授权替换完整输出时才加 `--overwrite`。
 
+单候选运行时，`$RAW_EXTRACTION_DIR` 可以直接包含
+`raw_extraction.json`；批量运行使用
+`$RAW_EXTRACTION_DIR/<canonical-stem>/raw_extraction.json`。finalizer 会递归
+建立哈希索引，不依赖候选目录名。
+
 finalizer 会校验 UTF-8、大小、候选集合、JSON Pointer、原文哈希及行号、
 10 题结构、联系方式、指令式内容、额外标题、分数复述、软链接、路径和私有
 权限，然后在输出目录同级创建 staging 并通过 rename 发布。失败的草稿只

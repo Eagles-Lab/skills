@@ -35,12 +35,25 @@ Thumbs.db
 # Resume inputs, raw extraction, generated output, and private calibration
 processing/
 outputs/
+raw-extractions/
+canonical-staging/
+canonical-inputs/
+private-output/
+private-forward-tests/
+private-calibration/
+deterministic-run/
+deterministic-batch/
+guidance-drafts/
+complete-run/
+canonical.json
 raw_extraction.json
 *_raw_extraction.json
 *_extracted.json
 calibration-private/
-sre-resume-analyzer/calibration-private/
 sre-resume-analyzer/private-data/
+
+# Generated local audit artifacts
+runtime-requirements.txt
 
 # Locally generated keyword artifacts
 sre-resume-analyzer/references/sre_keywords.md

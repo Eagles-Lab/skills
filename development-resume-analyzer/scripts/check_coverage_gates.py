@@ -14,6 +14,8 @@ CRITICAL_THRESHOLDS = {
     "src/development_resume_analyzer/output.py": 95.0,
     "src/development_resume_analyzer/dedup.py": 95.0,
     "src/development_resume_analyzer/source_audit.py": 95.0,
+    "src/development_resume_analyzer/dedup_core.py": 95.0,
+    "src/development_resume_analyzer/source_audit_core.py": 95.0,
 }
 
 

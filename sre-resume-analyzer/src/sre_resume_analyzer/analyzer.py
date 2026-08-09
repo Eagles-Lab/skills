@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -11,6 +12,7 @@ from typing import Any, Callable, Dict, Mapping, Optional
 
 from pydantic import ValidationError
 
+from .dedup_core import SourceIdentityKind, aggregate_source_sha256
 from .errors import AnalyzerError, InputValidationError, OutputSafetyError
 from .models import SCHEMA_VERSION, DataQualityWarning, Resume
 from .output import (
@@ -28,6 +30,7 @@ from .version import ANALYZER_VERSION, STATUS
 
 Clock = Callable[[], datetime]
 MISSING_DATA_MESSAGE = "未提供或未可靠识别，请后续补充。"
+_SHA256 = re.compile(r"^[a-f0-9]{64}$")
 
 
 def _utc_now() -> datetime:
@@ -119,7 +122,7 @@ class ResumeAnalyzer:
 
         source = Path(extracted_path)
         resume = load_resume(source)
-        input_sha256 = sha256_file(source)
+        input_sha256 = aggregate_source_sha256((sha256_file(source),))
         resume_id = (
             validate_resume_id(resume.resume_id)
             if resume.resume_id is not None
@@ -136,12 +139,55 @@ class ResumeAnalyzer:
         include_contact: bool = False,
         seed: Optional[str] = None,
     ) -> AnalysisArtifacts:
-        resume, input_sha256, resume_id, output_name = self.inspect_input(extracted_path)
-        source_audit = (
-            audit_source_mapping(raw_extraction_path, resume)
-            if raw_extraction_path is not None
-            else None
+        source = Path(extracted_path)
+        resume = load_resume(source)
+        canonical_sha256 = sha256_file(source)
+        source_audit = None
+        source_identity_kind: SourceIdentityKind = "canonical_json_sha256"
+        source_sha256 = canonical_sha256
+        if raw_extraction_path is not None:
+            source_audit = audit_source_mapping(raw_extraction_path, resume)
+            source_identity_kind = "raw_document_sha256"
+            source_sha256 = source_audit.raw_source_sha256
+        audits = (source_audit.public_metadata(),) if source_audit is not None else ()
+        return self.build_candidate_artifacts(
+            resume,
+            (source_sha256,),
+            primary_canonical_sha256=canonical_sha256,
+            source_identity_kind=source_identity_kind,
+            source_mapping_audits=audits,
+            include_contact=include_contact,
+            seed=seed,
         )
+
+    def build_candidate_artifacts(
+        self,
+        resume: Resume,
+        source_hashes: tuple[str, ...],
+        *,
+        output_name: str | None = None,
+        primary_sha256: str | None = None,
+        primary_canonical_sha256: str | None = None,
+        source_record_count: int | None = None,
+        source_identity_kind: SourceIdentityKind = "canonical_json_sha256",
+        conflicts: tuple[dict[str, str], ...] = (),
+        source_mapping_audits: tuple[Mapping[str, Any], ...] = (),
+        include_contact: bool = False,
+        seed: Optional[str] = None,
+    ) -> AnalysisArtifacts:
+        if not source_hashes or any(not _SHA256.fullmatch(value) for value in source_hashes):
+            raise InputValidationError("source hashes must contain SHA-256 digests")
+        source_hashes = tuple(sorted(set(source_hashes)))
+        input_sha256 = aggregate_source_sha256(source_hashes)
+        primary_sha256 = primary_sha256 or source_hashes[0]
+        primary_canonical_sha256 = primary_canonical_sha256 or primary_sha256
+        source_record_count = source_record_count or len(source_hashes)
+        resume_id = (
+            validate_resume_id(resume.resume_id)
+            if resume.resume_id is not None
+            else derive_resume_id(resume.basic_info.name, input_sha256)
+        )
+        output_name = output_name or derive_output_name(resume.basic_info.name, input_sha256)
         generated_at = self.clock().astimezone(UTC).replace(microsecond=0).isoformat()
         generated_at = generated_at.replace("+00:00", "Z")
         data_warnings = collect_data_quality_warnings(resume)
@@ -150,6 +196,14 @@ class ResumeAnalyzer:
             if contains_instruction_like_content(resume.model_dump(mode="python"))
             else []
         )
+        if (
+            any(
+                SECURITY_WARNING in audit.get("warning_codes", ())
+                for audit in source_mapping_audits
+            )
+            and SECURITY_WARNING not in security_warnings
+        ):
+            security_warnings.append(SECURITY_WARNING)
 
         try:
             score_data = _model_mapping(self.calculator.calculate(resume))
@@ -161,6 +215,7 @@ class ResumeAnalyzer:
                     "resume_id": resume_id,
                     "output_name": output_name,
                     "input_sha256": input_sha256,
+                    "source_hashes": list(source_hashes),
                     "generated_at": generated_at,
                     "security_warnings": security_warnings,
                     "data_quality_warnings": [
@@ -169,10 +224,19 @@ class ResumeAnalyzer:
                     "scoring_config_version": score_data.get(
                         "scoring_config_version", SCORING_CONFIG_VERSION
                     ),
+                    "deduplication": {
+                        "source_count": source_record_count,
+                        "source_record_count": source_record_count,
+                        "unique_source_count": len(source_hashes),
+                        "deduplicated_source_count": source_record_count - 1,
+                        "primary_sha256": primary_sha256,
+                        "primary_canonical_sha256": primary_canonical_sha256,
+                        "source_identity_kind": source_identity_kind,
+                        "conflicts": list(conflicts),
+                    },
+                    "source_mapping_audits": [dict(item) for item in source_mapping_audits],
                 }
             )
-            if source_audit is not None:
-                score_data["source_mapping_audit"] = source_audit.public_metadata()
             analysis = self._build_analysis(
                 score_data,
                 resume_id,
@@ -182,6 +246,7 @@ class ResumeAnalyzer:
                 security_warnings,
                 data_warnings,
             )
+            analysis["source_mapping_audits"] = score_data["source_mapping_audits"]
             rendered = self.renderer.render(
                 resume,
                 score_data,

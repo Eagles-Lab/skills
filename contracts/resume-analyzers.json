@@ -1,0 +1,234 @@
+{
+  "schema_version": "1.0",
+  "required_root_files": [
+    "AGENTS.md",
+    "CLAUDE.md",
+    "README.md",
+    ".gitignore",
+    ".github/workflows/resume-analyzer-contracts.yml",
+    ".github/workflows/sre-resume-analyzer.yml",
+    ".github/workflows/security-resume-analyzer.yml",
+    ".github/workflows/development-resume-analyzer.yml",
+    "contracts/fixtures/resume-identity-vectors.json",
+    "tools/check_resume_analyzer_contracts.py",
+    "tools/check_markdown_links.py"
+  ],
+  "required_gitignore_patterns": [
+    "canonical.json",
+    "raw_extraction.json",
+    "*_raw_extraction.json",
+    "*_extracted.json",
+    "canonical-inputs/",
+    "canonical-staging/",
+    "raw-extractions/",
+    "private-output/",
+    "private-forward-tests/",
+    "private-calibration/",
+    "calibration-private/",
+    "deterministic-run/",
+    "deterministic-batch/",
+    "guidance-drafts/",
+    "complete-run/"
+  ],
+  "critical_coverage_modules": {
+    "dedup_core.py": 95.0,
+    "source_audit.py": 95.0,
+    "source_audit_core.py": 95.0
+  },
+  "skill_sections": [
+    "Scope and status",
+    "Required references",
+    "Trust boundary",
+    "Choose an input path",
+    "Map to canonical facts",
+    "Audit source grounding",
+    "Run deterministic analysis",
+    "Analyze and deduplicate a batch",
+    "Score and diagnose evidence",
+    "Verify deterministic output",
+    "Publish complete Skill output",
+    "Report failures and results"
+  ],
+  "required_files": [
+    "README.md",
+    "SKILL.md",
+    "agents/openai.yaml",
+    "pyproject.toml",
+    "uv.lock",
+    ".python-version",
+    "references/canonical-schema.md",
+    "references/privacy-security.md",
+    "references/document-workflow.md",
+    "references/source-audit.md",
+    "references/deduplication.md",
+    "references/evidence-model.md",
+    "references/scoring-rubric.md",
+    "references/local-guidance-layer.md",
+    "references/codex.md",
+    "references/claude.md",
+    "references/extracted_resume.schema.json",
+    "scripts/finalize_guidance.py",
+    "src",
+    "tests"
+  ],
+  "forbidden_skill_files": [
+    "AGENTS.md",
+    "CLAUDE.md",
+    ".gitignore",
+    "references/schema.md",
+    "references/privacy-and-security.md",
+    "references/pdf-workflow.md",
+    "references/source-mapping-audit.md"
+  ],
+  "readme_contract": {
+    "min_lines": 24,
+    "max_lines": 80,
+    "sections": [
+      "Start here",
+      "Release status",
+      "Package components",
+      "Trust and scoring boundary",
+      "Development"
+    ],
+    "required_fragments": [
+      "SKILL.md",
+      "non-normative",
+      "AGENTS.md"
+    ],
+    "forbidden_patterns": [
+      "uv\\s+run",
+      "--[a-z][a-z-]+",
+      "RUN_ROOT|COMPLETE_RUN",
+      "guidance_manifest\\.json",
+      "finalize_guidance",
+      "exit codes?",
+      "\\|\\s*Dimension\\s*\\|\\s*Weight"
+    ]
+  },
+  "skill_required_fragments": [
+    "source_mapping_audits",
+    "source_identity_kind",
+    "batch_summary.json",
+    "guidance_manifest.json",
+    "0700",
+    "0600",
+    "deterministic_fallback"
+  ],
+  "shared_files": [
+    "scripts/finalize_guidance.py",
+    "references/local-guidance-layer.md",
+    "tests/create_guidance_smoke_draft.py",
+    "tests/test_finalize_guidance.py",
+    "tests/test_dedup_contract.py",
+    "tests/test_source_audit_core_contract.py",
+    "src/{package}/source_audit_core.py",
+    "src/{package}/dedup_core.py"
+  ],
+  "analyzers": [
+    {
+      "directory": "sre-resume-analyzer",
+      "skill_name": "sre-resume-analyzer",
+      "package": "sre_resume_analyzer",
+      "workflow": ".github/workflows/sre-resume-analyzer.yml",
+      "version": "3.0.0rc3",
+      "status": "experimental",
+      "scoring_profile": "cn-campus-sre",
+      "runtime_required_tokens": ["analyzer_status", "dimension_scores", "total_score", "grade"],
+      "scripts": {
+        "analyze-resume": "sre_resume_analyzer.cli:analyze_main",
+        "batch-analyze": "sre_resume_analyzer.cli:batch_main",
+        "extract-resume-text": "sre_resume_analyzer.cli:extract_main"
+      },
+      "cli_flags": {
+        "analyze-resume": ["--extracted", "--raw-extraction", "--output-dir", "--include-contact", "--overwrite", "--seed"],
+        "batch-analyze": ["--input-dir", "--raw-extraction-dir", "--output-dir", "--parallel", "--overwrite"],
+        "extract-resume-text": ["pdf", "--output", "--overwrite", "--max-pages", "--timeout-seconds"]
+      }
+    },
+    {
+      "directory": "security-resume-analyzer",
+      "skill_name": "security-resume-analyzer",
+      "package": "security_resume_analyzer",
+      "workflow": ".github/workflows/security-resume-analyzer.yml",
+      "version": "1.1.0",
+      "status": "stable",
+      "calibration_status": "not_calibrated",
+      "scoring_profile": "cn-campus-security-general",
+      "runtime_required_tokens": ["analyzer_status", "calibration_status", "dimension_scores", "total_score", "grade"],
+      "scripts": {
+        "analyze-security-resume": "security_resume_analyzer.cli:analyze_main",
+        "batch-analyze-security": "security_resume_analyzer.cli:batch_main",
+        "extract-security-resume-text": "security_resume_analyzer.cli:extract_main",
+        "calibrate-security-scoring": "security_resume_analyzer.cli:calibrate_main"
+      },
+      "cli_flags": {
+        "analyze-security-resume": ["--extracted", "--raw-extraction", "--output-dir", "--include-contact", "--overwrite", "--seed"],
+        "batch-analyze-security": ["--input-dir", "--raw-extraction-dir", "--output-dir", "--parallel", "--overwrite"],
+        "extract-security-resume-text": ["pdf", "--output", "--overwrite", "--max-pages", "--timeout-seconds"],
+        "calibrate-security-scoring": ["--resumes", "--reviews", "--output-dir", "--overwrite"]
+      }
+    },
+    {
+      "directory": "development-resume-analyzer",
+      "skill_name": "development-resume-analyzer",
+      "package": "development_resume_analyzer",
+      "workflow": ".github/workflows/development-resume-analyzer.yml",
+      "version": "1.1.0",
+      "status": "stable",
+      "calibration_status": "not_calibrated",
+      "scoring_profile": "cn-campus-software-development-general",
+      "runtime_required_tokens": ["analyzer_status", "calibration_status", "dimension_scores", "total_score", "grade"],
+      "scripts": {
+        "analyze-development-resume": "development_resume_analyzer.cli:analyze_main",
+        "batch-analyze-development": "development_resume_analyzer.cli:batch_main",
+        "extract-development-resume-text": "development_resume_analyzer.cli:extract_main",
+        "calibrate-development-scoring": "development_resume_analyzer.cli:calibrate_main"
+      },
+      "cli_flags": {
+        "analyze-development-resume": ["--extracted", "--raw-extraction", "--output-dir", "--include-contact", "--overwrite", "--seed"],
+        "batch-analyze-development": ["--input-dir", "--raw-extraction-dir", "--output-dir", "--parallel", "--overwrite"],
+        "extract-development-resume-text": ["pdf", "--output", "--overwrite", "--max-pages", "--timeout-seconds"],
+        "calibrate-development-scoring": ["--resumes", "--reviews", "--output-dir", "--overwrite"]
+      }
+    }
+  ],
+  "finalizer_flags": [
+    "--deterministic-run",
+    "--draft-dir",
+    "--output-dir",
+    "--generator",
+    "--raw-extraction-dir",
+    "--overwrite"
+  ],
+  "finalizer_contract_tokens": [
+    "SCHEMA_VERSION = \"1.0\"",
+    "generator_requested",
+    "deterministic_fallback",
+    "citation_counts",
+    "deterministic_suggestions_sha256",
+    "suggestions_sha256"
+  ],
+  "runtime_contract_tokens": [
+    "source_mapping_audits",
+    "audit_version",
+    "raw_source_sha256",
+    "canonical_facts_sha256",
+    "checked_fact_count",
+    "source_hashes",
+    "source_record_count",
+    "unique_source_count",
+    "deduplicated_source_count",
+    "conflict_failure_count",
+    "source_identity_kind"
+  ],
+  "workflow_contract_tokens": [
+    "ruff format --check",
+    "mypy src",
+    "--cov=",
+    "check_coverage_gates.py",
+    "pip-audit",
+    "bandit",
+    "uv build --wheel",
+    "finalize_guidance.py"
+  ]
+}
