@@ -10,6 +10,7 @@ from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parents[1]
 SKIP_PARTS = {
+    ".ci",
     ".git",
     ".mypy_cache",
     ".pytest_cache",
