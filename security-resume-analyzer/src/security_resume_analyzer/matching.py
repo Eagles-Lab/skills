@@ -403,9 +403,37 @@ _OUTCOME = re.compile(
     re.I,
 )
 _NEGATION = re.compile(
-    r"(?:不|未|无|没有|仅了解|学习中)[^，。;；\n]{0,16}$|\b(?:no experience|not familiar|never|without)\b[^.!?;]*$",
+    r"(?:不|未|无|没有|仅了解|学习中)[^，,。.;；\n]{0,16}$|"
+    r"\b(?:no experience|not familiar|never|without)\b[^.!?;]*$",
     re.I,
 )
+_OBJECT_UNCERTAINTY = re.compile(
+    r"(?:来源|产地|归属)(?:不明|不确定|未知|未确认)(?:的)?|"
+    r"(?:检测|分析|识别|研判|评估)?结果(?:不明|不确定|未知|未确认)(?:的)?",
+    re.I,
+)
+_NON_ASSERTIVE_TOOL_USE = re.compile(
+    r"(?:不确定|未知|未确认|不明)?(?:的)?\s*(?:[，,:：;；]\s*)?"
+    r"(?:到底|究竟)?(?:是否|有无|能否|可否|会否|有没有|能不能|可不可以)"
+    r"[^，,。.;；:：!?！？\n]{0,24}$|"
+    r"(?:uncertain|unclear|unknown|unconfirmed)?\s*(?:whether|if)\s+[^.!?;\n]{0,32}$",
+    re.I,
+)
+_NON_ASSERTIVE_TOOL_USE_SUFFIX = re.compile(
+    r"^\s*(?:的)?\s*(?:实际)?(?:使用|应用|采用|部署|运行)"
+    r"(?:情况|状态|记录|证据)?\s*(?:仍|尚|目前)?"
+    r"(?:不确定|不明|未知|未确认|待确认)|"
+    r"^\s*(?:的)?\s*(?:实际)?(?:使用|应用|采用|部署|运行)?"
+    r"(?:情况|状态|记录|证据)?\s*"
+    r"(?:是否|有无|能否|可否|会否|有没有|能不能|可不可以)|"
+    r"^\s*(?:actual\s+)?(?:use|usage|deployment|operation)\s+"
+    r"(?:is\s+|was\s+|remains?\s+)?(?:uncertain|unclear|unknown|unconfirmed)",
+    re.I,
+)
+
+
+def _mask_object_uncertainty(value: str) -> str:
+    return _OBJECT_UNCERTAINTY.sub(lambda match: " " * len(match.group(0)), value)
 
 
 def normalize_text(text: str) -> str:
@@ -530,7 +558,12 @@ class EvidenceMatcher:
                     for variant in sorted(set(variants), key=lambda value: (-len(value), value)):
                         for match in term_pattern(variant).finditer(normalized):
                             prefix = normalized[max(0, match.start() - 48) : match.start()]
-                            if not _NEGATION.search(prefix):
+                            suffix = normalized[match.end() : match.end() + 48]
+                            if (
+                                not _NON_ASSERTIVE_TOOL_USE.search(prefix)
+                                and not _NEGATION.search(_mask_object_uncertainty(prefix))
+                                and not _NON_ASSERTIVE_TOOL_USE_SUFFIX.search(suffix)
+                            ):
                                 positions.append(match.start())
                     if not positions:
                         continue

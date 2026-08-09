@@ -6,6 +6,7 @@ import hashlib
 import json
 import re
 import unicodedata
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -27,6 +28,198 @@ _CLAUSE_SPLIT_PATTERN = re.compile(
 _CLAUSE_BOUNDARY = "\x00"
 _ASCII_WORD_BOUNDARY = "\x01"
 _NEGATION_CONTEXT_CHARS = 96
+_FUTURE_PREFIX_PATTERN = re.compile(
+    r"(?:(?<!按)(?<!按照)计划|拟|希望|预计|预期|准备|打算|有意|考虑|可能|也许|或许|将|"
+    r"未来(?:将|会)?|将来(?:将|会)?|目标(?:是|为)|尚?待(?:进一步)?)"
+    r"(?:将|会)?"
+    r"(?:(?:于|在)[\u4e00-\u9fffA-Za-z0-9]{0,24}|"
+    r"(?:明年|来年|下(?:一)?季度|近期|最终|以后|后续))?"
+    r"(?:学习|使用|采用|应用|掌握|负责|完成|实现|部署|提升|开发|用于|用)"
+    r"[\u4e00-\u9fffA-Za-z0-9]{0,32}$|"
+    r"(?:planto|intendto|hopeto|expectto|aimto|wouldliketo|goingto|will|may|might|could)"
+    r"(?:possibly)?$|"
+    r"(?:planto|intendto|hopeto|expectto|aimto|wouldliketo|goingto|will|may|might|could)"
+    r"(?:possibly)?(?:be)?"
+    r"(?:learn|use|using|used|apply|applied|adopt|adopted|master|own|complete|implement|deploy|improve|develop)"
+    r"[a-z0-9]{0,32}$",
+    re.I,
+)
+_FUTURE_MARKER_PATTERN = re.compile(
+    r"(?:(?<!按)(?<!按照)计划|拟|希望|预计|预期|准备|打算|有意|考虑|可能|也许|或许|将|"
+    r"未来(?:将|会)?|将来(?:将|会)?|目标(?:是|为)|尚?待(?:进一步)?|"
+    r"planto|intendto|hopeto|expectto|aimto|wouldliketo|goingto|will|may|might|could)$",
+    re.I,
+)
+_FUTURE_ACTION_PREFIX_PATTERN = re.compile(
+    r"^(?:学习|使用|采用|应用|掌握|负责|完成|实现|部署|提升|开发|用于|用|"
+    r"learn|use|using|used|apply|applied|adopt|adopted|master|own|complete|implement|deploy|improve|develop)",
+    re.I,
+)
+_REALIZED_PLAN_CUE_PATTERN = re.compile(
+    r"(?:按|按照)[\u4e00-\u9fff]{0,12}?计划"
+    r"(?=(?:已|已经|如期|顺利|成功)?(?:完成(?!度)|实现|交付|上线|落地|达成))"
+)
+_PLAN_EXECUTION_CUE_AT_END_PATTERN = re.compile(r"(?:按|按照)[\u4e00-\u9fff]{0,12}?计划$")
+_REALIZED_ACTION_PREFIX_PATTERN = re.compile(
+    r"^(?:完成(?!度)|实现|交付|上线|落地|达成|"
+    r"completed|implemented|delivered|launched|achieved)",
+    re.I,
+)
+_FUTURE_SUFFIX_PATTERN = re.compile(
+    r"^(?:(?:\u8ba1\u5212|\u62df|\u5e0c\u671b|\u9884\u8ba1|\u9884\u671f|\u51c6\u5907|\u6253\u7b97|\u672a\u6765|\u5c06\u6765|\u5c06|\u53ef\u80fd|\u4e5f\u8bb8|\u6216\u8bb8|"
+    r"\u5c1a?\u5f85)(?:\u4f1a|\u5c06)?(?:\u88ab)?(?:\u5b66\u4e60|\u4f7f\u7528|\u91c7\u7528|\u5e94\u7528|\u638c\u63e1|\u8d1f\u8d23|\u5b8c\u6210|\u5b9e\u73b0|\u90e8\u7f72|\u63d0\u5347|\u5f00\u53d1|\u7528\u4e8e|\u5728|\u7528)|"
+    r"(?:planto|intendto|hopeto|expectto|aimto|wouldliketo|goingto|will|may|might|could)"
+    r"(?:possibly)?(?:be)?(?:learned|used|applied|adopted|learn|use|apply|adopt))",
+    re.I,
+)
+_UNCERTAIN_PREFIX_PATTERN = re.compile(
+    r"(?:可能|也许|或许)(?:会|将)?(?:已经|已|曾经|后来|随后)?"
+    r"(?:学习|使用|采用|应用|掌握|负责|完成|实现|部署|提升|开发|用于|用)"
+    r"[\u4e00-\u9fffA-Za-z0-9]{0,32}$|"
+    r"(?:may|might|could)(?:possibly)?(?:already|later)?(?:be)?"
+    r"(?:learn|use|using|used|apply|applied|adopt|adopted|master|own|complete|implement|deploy|improve|develop)"
+    r"[a-z0-9]{0,32}$",
+    re.I,
+)
+_UNCERTAIN_SUFFIX_PATTERN = re.compile(
+    r"^(?:可能|也许|或许)(?:会|将)?(?:已经|已|曾经|后来|随后)?(?:被)?"
+    r"(?:学习|使用|采用|应用|掌握|负责|完成|实现|部署|提升|开发|用于|用)|"
+    r"^(?:may|might|could)(?:possibly)?(?:already|later)?(?:be)?"
+    r"(?:learned|used|applied|adopted|learn|use|apply|adopt)",
+    re.I,
+)
+_UNCERTAINTY_BEFORE_TURN_PATTERN = re.compile(
+    r"(?:可能|也许|或许)(?:会|将)?$|(?:may|might|could)(?:possibly)?$",
+    re.I,
+)
+_LONG_NEGATIVE_PREFIX_PATTERN = re.compile(
+    r"(?:\u5e76\u4e0d|\u4e0d\u66fe|\u4ece\u672a|\u5c1a\u672a|\u8fd8\u672a|\u5e76\u672a|\u672a\u66fe|\u6ca1\u6709|\u6ca1|\u672a)"
+    r"(?:\u5b9e\u9645|\u771f\u6b63|\u66fe\u7ecf|\u6210\u529f)?"
+    r"(?:\u5728[\u4e00-\u9fffA-Za-z0-9]{0,48}?(?:\u4e2d|\u5185)?|\u4e8e[\u4e00-\u9fffA-Za-z0-9]{0,48}?)?"
+    r"(?:\u4f7f\u7528|\u7528\u8fc7|\u7528\u4e8e|\u5e94\u7528|\u638c\u63e1|\u719f\u6089|\u4e86\u89e3|\u63a5\u89e6|\u5b66\u4e60|\u5b9e\u8df5|"
+    r"\u53c2\u4e0e|\u5177\u5907|\u8d1f\u8d23|\u5f00\u53d1|\u90e8\u7f72|\u5b8c\u6210|\u5b9e\u73b0|\u63d0\u5347)(?:\u8fc7|\u5230|\u4e8e)?"
+    r"[\u4e00-\u9fff]{0,12}$",
+    re.I,
+)
+_REALIZATION_TURN_PATTERN = re.compile(
+    r"(?:但(?:是)?|不过|然而|却|转而|后来|随后|现已|已经)|"
+    r"(?:(?<!按)(?<!按照)计划|拟|希望|预计|预期|准备|打算)"
+    r"(?:将|会)?[\u4e00-\u9fffA-Za-z0-9]{0,24}"
+    r"(?:学习|使用|采用|应用|掌握|负责|完成|实现|部署|提升|开发|用于)"
+    r"[\u4e00-\u9fffA-Za-z0-9]{1,24}(?:最终|最后|(?<!未)(?<!不)实际)",
+    re.I,
+)
+_NON_EXCLUSIVE_NEGATION_PREFIX_PATTERN = re.compile(
+    r"(?:从未|未曾|并未|没有|没|不曾|并非)"
+    r"[\u4e00-\u9fffA-Za-z0-9]{0,32}(?:只|仅|单独)(?:使用|采用|依赖)$",
+    re.I,
+)
+_ADDITIONAL_USAGE_SUFFIX_PATTERN = re.compile(
+    r"^(?:还|也|同时|另外|另(?:外)?|并且|而且|并|且|又)"
+    r"(?:还|也)?(?:使用|采用|依赖|运用|应用|选用|用(?:到|了)?)"
+    r"[\u4e00-\u9fffA-Za-z0-9_.+#/@:%‰\-]{1,48}",
+    re.I,
+)
+_EN_EXPERIENCE = r"(?:relevant|project|work|production|professional)?experience"
+_EN_NO_EXPERIENCE_VALUE = r"(?:nonexistent|absent|lacking|none|zero|nil|no|0)"
+_EN_EXPERIENCE_LINK = (
+    r"(?:is|was|were|equals?|equaled|equalled|has|have|had|hasbeen|havebeen|hadbeen|"
+    r"isequalto|wasequalto|wereequalto|totals?|amountsto|consistsof|[=:-])?"
+)
+_CN_EXPERIENCE = r"(?:相关|项目|工作|生产|实战)?(?:经验|经历)"
+_CN_NO_EXPERIENCE_VALUE = r"(?:不存在|没有|缺失|欠缺|0|零|无)"
+_ZERO_EXPERIENCE_CONTEXT_PATTERN = re.compile(
+    rf"(?:"
+    rf"\x02{_EN_EXPERIENCE}{_EN_EXPERIENCE_LINK}{_EN_NO_EXPERIENCE_VALUE}"
+    rf"(?:years?|months?)?(?=$|and|but|while|from|in|for|at)|"
+    rf"\x02(?:has|have|had|hashad|havehad|hadhad|is|was|were)?"
+    rf"{_EN_NO_EXPERIENCE_VALUE}(?:years?|months?)?(?:of)?{_EN_EXPERIENCE}|"
+    rf"{_EN_NO_EXPERIENCE_VALUE}(?:years?|months?)?(?:of)?\x02{_EN_EXPERIENCE}|"
+    rf"{_EN_NO_EXPERIENCE_VALUE}(?:years?|months?)?(?:of)?{_EN_EXPERIENCE}"
+    rf"(?:with|in|using|on)\x02|"
+    rf"\x02{_CN_EXPERIENCE}(?:曾|曾经|目前|当前)?(?:为|是|有|等于)?"
+    rf"{_CN_NO_EXPERIENCE_VALUE}(?:年|个月|月)?(?=$|但|并|且|同时|而)|"
+    rf"\x02(?:曾|曾经|目前|当前)?(?:有|具有)?{_CN_NO_EXPERIENCE_VALUE}"
+    rf"(?:年|个月|月)?(?:的)?{_CN_EXPERIENCE}|"
+    rf"{_CN_NO_EXPERIENCE_VALUE}(?:年|个月|月)?\x02{_CN_EXPERIENCE}|"
+    rf"{_CN_NO_EXPERIENCE_VALUE}(?:年|个月|月)?{_CN_EXPERIENCE}(?:使用|关于|针对|的)\x02"
+    rf")",
+    re.I,
+)
+_LACK_EXPERIENCE_CONTEXT_PATTERN = re.compile(
+    rf"(?:lack|lacks|lacked|lacking)(?:of)?\x02{_EN_EXPERIENCE}|"
+    rf"\x02(?:is|was|were)?(?:currently)?(?:lack|lacks|lacked|lacking){_EN_EXPERIENCE}|"
+    rf"(?:缺乏|欠缺)(?:对|于)?\x02{_CN_EXPERIENCE}|"
+    rf"\x02(?:目前|当前)?(?:缺乏|欠缺){_CN_EXPERIENCE}",
+    re.I,
+)
+_REJECTED_EVALUATION_CONTEXT_PATTERN = re.compile(
+    r"(?:"
+    r"\x02(?:was|were|is|hasbeen|hadbeen)?"
+    r"(?:considered|evaluated|assessed|reviewed|researched|proposed|tested)"
+    r"[a-z0-9]{0,32}(?:but|yet|however|onlyto|only)"
+    r"(?:ultimately|finally)?(?:(?:not|never)"
+    r"(?:used|adopted|deployed|selected|chosen|applied|implemented)|"
+    r"(?:rejected|declined|discarded))|"
+    r"(?:considered|evaluated|assessed|reviewed|researched|proposed|tested)"
+    r"[a-z0-9]{0,32}\x02(?:but|yet|however|onlyto|then)?"
+    r"(?:ultimately|finally)?(?:(?:not|never)"
+    r"(?:used|adopted|deployed|selected|chosen|applied|implemented)(?:it)?|"
+    r"(?:didnot|didnt)(?:use|adopt|deploy|select|choose|apply|implement)(?:it)?|"
+    r"(?:rejected|declined|discarded))|"
+    r"\x02(?:曾|已)?(?:评估|考虑|调研|考察|测试)(?:过)?"
+    r"[一-鿿A-Za-z0-9]{0,24}(?:但|但是|不过|然而|却)"
+    r"(?:最终|最后)?(?:尚未|并未|从未|未曾|未|没有|没)"
+    r"(?:使用|采用|选用|应用|落地|部署|投入使用)|"
+    r"(?:曾|已)?(?:评估|考虑|调研|考察|测试)(?:过)?"
+    r"[一-鿿A-Za-z0-9]{0,24}\x02(?:但|但是|不过|然而|却)"
+    r"(?:最终|最后)?(?:尚未|并未|从未|未曾|未|没有|没)"
+    r"(?:使用|采用|选用|应用|落地|部署|投入使用)"
+    r")",
+    re.I,
+)
+_RESEARCH_ONLY_NEGATIVE_CONTEXT_PATTERN = re.compile(
+    r"(?:"
+    r"\x02(?:仅(?:做)?|只(?:做)?)?(?:评估|考虑|调研|考察|测试)(?:过)?"
+    r"(?:但|但是|不过|然而|却)?(?:最终|最后)?"
+    r"(?:尚未|并未|从未|未曾|不曾|未|没有|没)"
+    r"(?:实际|真正)?(?:在[一-鿿A-Za-z0-9]{1,24}(?:中|内)?)?"
+    r"(?:使用|采用|选用|应用|落地|部署|投入使用)|"
+    r"(?:曾|已)?(?:评估|考虑|调研|考察|测试)(?:过)?"
+    r"\x02(?:但|但是|不过|然而|却)?(?:最终|最后)?"
+    r"(?:尚未|并未|从未|未曾|不曾|未|没有|没)"
+    r"(?:实际|真正)?(?:在[一-鿿A-Za-z0-9]{1,24}(?:中|内)?)?"
+    r"(?:使用|采用|选用|应用|落地|部署|投入使用)"
+    r")"
+)
+_CONCEPT_ONLY_NO_EXPERIENCE_CONTEXT_PATTERN = re.compile(
+    r"(?:仅|只)(?:了解|学习|掌握)\x02(?:概念|理论|基础)"
+    r"(?:但|但是|不过|然而|却)?"
+    r"(?:尚无|并无|没有|无|缺乏|欠缺)(?:实战|项目|实践)(?:经验|经历)"
+)
+_POST_BOUNDARY_NEGATIVE_SUFFIX_PATTERN = re.compile(
+    r"^(?:"
+    r"(?:(?:but|however|yet|though|nevertheless))?"
+    r"(?:ultimately|finally)?"
+    r"(?:(?:is|are|was|were|has|have|had)(?:been)?)?"
+    r"(?:ultimately|finally)?"
+    r"(?:not|never|isnt|arent|wasnt|werent|hasnt|havent|hadnt)(?:been)?"
+    r"(?:used|adopted|deployed|selected|chosen|applied|implemented)|"
+    r"(?:didnot|didnt)(?:use|adopt|deploy|select|choose|apply|implement)(?:it)?|"
+    r"(?:remains?|remained)(?:currently)?(?:unused|unadopted|undeployed|unselected)|"
+    r"(?:但|但是|不过|然而|却)?(?:最终|最后)?(?:仍|仍然)?"
+    r"(?:尚未|并未|从未|未曾|不曾|未|没有|没)(?:被)?"
+    r"(?:使用|采用|选用|应用|落地|部署|投入使用)"
+    r")",
+    re.I,
+)
+_QUOTED_SPAN_PATTERNS = (
+    re.compile(r'"[^"\r\n]{1,2048}"'),
+    re.compile(r"“[^”\r\n]{1,2048}”"),
+    re.compile(r"`[^`\r\n]{1,2048}`"),
+    re.compile(r"'[^'\r\n]{1,2048}'"),
+    re.compile(r"\u2018[^\u2019\r\n]{1,2048}\u2019"),
+)
 _ALIAS_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("kubernetes", ("kubernetes", "k8s")),
     ("go", ("go", "golang")),
@@ -142,6 +335,61 @@ def load_raw_extraction(path: Path, error_type: type[Exception]) -> RawExtractio
     if not isinstance(digest, str) or not _SHA256_PATTERN.fullmatch(digest):
         _raise(error_type, "raw_extraction_sha256_invalid", "/source_sha256")
     return RawExtraction(full_text=full_text, source_sha256=digest.lower())
+
+
+def filter_instruction_like_evidence(
+    raw_text: str,
+    instruction_detector: Callable[[str], bool],
+    strong_instruction_detector: Callable[[str], bool],
+) -> str:
+    """Exclude instruction-like lines from evidence while preserving ordinary resume text.
+
+    Strong instruction phrases split over at most three adjacent lines are masked as one unit.
+    Separate weak signals never cause the entire resume to be discarded. The caller retains the
+    original extraction for hashing and warnings.
+    """
+
+    if not instruction_detector(raw_text):
+        return raw_text
+    lines = [
+        _mask_quoted_instruction_examples(line, instruction_detector)
+        for line in raw_text.splitlines(keepends=True)
+    ]
+    masked = {index for index, line in enumerate(lines) if instruction_detector(line)}
+    for window_size in range(2, min(3, len(lines)) + 1):
+        for start in range(0, len(lines) - window_size + 1):
+            indexes = range(start, start + window_size)
+            if any(index in masked for index in indexes):
+                continue
+            if strong_instruction_detector("".join(lines[index] for index in indexes)):
+                masked.update(indexes)
+    if not masked:
+        return "".join(lines)
+    return "".join(
+        _mask_text_preserving_line_breaks(line) if index in masked else line
+        for index, line in enumerate(lines)
+    )
+
+
+def _mask_quoted_instruction_examples(
+    line: str,
+    instruction_detector: Callable[[str], bool],
+) -> str:
+    filtered = line
+    for pattern in _QUOTED_SPAN_PATTERNS:
+        filtered = pattern.sub(
+            lambda match: (
+                _mask_text_preserving_line_breaks(match.group())
+                if instruction_detector(match.group())
+                else match.group()
+            ),
+            filtered,
+        )
+    return filtered
+
+
+def _mask_text_preserving_line_breaks(text: str) -> str:
+    return "".join(character if character in "\r\n" else " " for character in text)
 
 
 def normalize_text(value: str) -> str:
@@ -336,6 +584,7 @@ def direct_fact_is_grounded(value: str | int, raw_text: str) -> bool:
                 normalized_raw,
                 match.start(),
                 match.end(),
+                claim=_compact(claim),
                 numeric_claim=numeric_claim,
             )
             for item in _ALIASES.get(claim, (claim,))
@@ -375,7 +624,11 @@ def direct_fact_is_grounded(value: str | int, raw_text: str) -> bool:
         if _compact_context_is_positive(
             compact_source[prefix_start : match.start()],
             compact_source[match.end() : suffix_end],
+            claim=compact_claim,
             numeric_claim=numeric_claim,
+            additional_usage_suffix=compact_source[
+                match.end() : match.end() + _NEGATION_CONTEXT_CHARS
+            ].lstrip(_CLAUSE_BOUNDARY + _ASCII_WORD_BOUNDARY),
         ):
             return True
     return False
@@ -386,6 +639,7 @@ def _occurrence_is_positive(
     start: int,
     end: int,
     *,
+    claim: str,
     numeric_claim: bool = False,
 ) -> bool:
     prefix_source = source[max(0, start - _NEGATION_CONTEXT_CHARS) : start]
@@ -398,17 +652,58 @@ def _occurrence_is_positive(
         suffix_source = suffix_source[: separator.start()]
     prefix = _compact(prefix_source)
     suffix = _compact(suffix_source)
-    return _compact_context_is_positive(prefix, suffix, numeric_claim=numeric_claim)
+    return _compact_context_is_positive(
+        prefix,
+        suffix,
+        claim=claim,
+        numeric_claim=numeric_claim,
+        additional_usage_suffix=_compact(source[end : end + _NEGATION_CONTEXT_CHARS]),
+    )
 
 
 def _compact_context_is_positive(
     prefix: str,
     suffix: str,
     *,
+    claim: str,
     numeric_claim: bool = False,
+    additional_usage_suffix: str = "",
 ) -> bool:
     prefix = prefix.replace(_ASCII_WORD_BOUNDARY, "")
     suffix = suffix.replace(_ASCII_WORD_BOUNDARY, "")
+    full_suffix = additional_usage_suffix.replace(_ASCII_WORD_BOUNDARY, "")
+    local_context = f"{prefix}\x02{suffix}"
+    full_context = f"{prefix}\x02{full_suffix}"
+    if (
+        _ZERO_EXPERIENCE_CONTEXT_PATTERN.search(local_context)
+        or _LACK_EXPERIENCE_CONTEXT_PATTERN.search(local_context)
+        or _REJECTED_EVALUATION_CONTEXT_PATTERN.search(full_context)
+        or _RESEARCH_ONLY_NEGATIVE_CONTEXT_PATTERN.search(full_context)
+        or _CONCEPT_ONLY_NO_EXPERIENCE_CONTEXT_PATTERN.search(full_context)
+        or _POST_BOUNDARY_NEGATIVE_SUFFIX_PATTERN.match(full_suffix)
+    ):
+        return False
+    future_prefix = _REALIZED_PLAN_CUE_PATTERN.sub("", prefix)
+    if _REALIZED_ACTION_PREFIX_PATTERN.match(claim):
+        future_prefix = _PLAN_EXECUTION_CUE_AT_END_PATTERN.sub("", future_prefix)
+    realization_turns = tuple(
+        match
+        for match in _REALIZATION_TURN_PATTERN.finditer(future_prefix)
+        if not _UNCERTAINTY_BEFORE_TURN_PATTERN.search(future_prefix[: match.start()])
+    )
+    if realization_turns:
+        future_prefix = future_prefix[realization_turns[-1].end() :]
+    future_marker_before_action = bool(
+        _FUTURE_MARKER_PATTERN.search(future_prefix) and _FUTURE_ACTION_PREFIX_PATTERN.match(claim)
+    )
+    if (
+        _FUTURE_PREFIX_PATTERN.search(future_prefix)
+        or _UNCERTAIN_PREFIX_PATTERN.search(future_prefix)
+        or future_marker_before_action
+        or _FUTURE_SUFFIX_PATTERN.match(suffix.lstrip(":-="))
+        or _UNCERTAIN_SUFFIX_PATTERN.match(suffix.lstrip(":-="))
+    ):
+        return False
     if numeric_claim:
         approximate_prefix = re.search(
             r"(?:约为|大约为|估计为|约|大约|不到|超过|近|至少|至多|最多|最少|"
@@ -432,6 +727,8 @@ def _compact_context_is_positive(
         prefix,
     ):
         return True
+    if _NON_EXCLUSIVE_NEGATION_PREFIX_PATTERN.search(prefix):
+        return bool(_ADDITIONAL_USAGE_SUFFIX_PATTERN.match(additional_usage_suffix))
     if re.search(r"(?:无|尚无|缺乏|零)$", prefix) and re.match(r"(?:经验|基础|实践|能力)", suffix):
         return False
     negative_prefix = re.search(
@@ -444,34 +741,37 @@ def _compact_context_is_positive(
         prefix,
         re.I,
     )
+    long_negative_prefix = _LONG_NEGATIVE_PREFIX_PATTERN.search(prefix)
     negative_suffix = re.match(
         r"(?:(?:经验)?(?:无|暂无|没有)|不会|不熟悉|不掌握|不了解|不懂|不具备|"
-        r"未使用|未曾使用|未掌握|未了解|未参与|未参加|未接触|未学习|未学|"
-        r"尚未(?:学习|使用|掌握|了解|接触)|从未(?:学习|使用|掌握|了解|接触)|"
+        r"未使用|未曾使用|未采用|未落地|未部署|未掌握|未了解|未参与|未参加|未接触|未学习|未学|"
+        r"尚未(?:学习|使用|采用|落地|部署|掌握|了解|接触)|"
+        r"从未(?:学习|使用|采用|落地|部署|掌握|了解|接触)|"
         r"(?:目前|当前|暂时|暂|实际|其实|完全|确实|并|从来|尚)?"
         r"(?:尚未|还未|并未|从未|未曾|不曾|未|没有|没|并不|不)"
-        r"(?:实际|真正)?(?:被)?(?:使用|用过|用于|应用|掌握|熟悉|了解|懂|接触|学习|实践|参与|具备|会|能)|"
+        r"(?:实际|真正)?(?:被)?(?:使用|用过|用于|应用|采用|选用|落地|部署|掌握|熟悉|了解|懂|接触|学习|实践|参与|具备|会|能)|"
         r"(?:目前|当前|暂时|暂|实际|其实|完全|确实)?(?:无法|未能)"
         r"(?:实际)?(?:使用|用于|应用|掌握|熟悉|了解|接触|学习|实践|参与)|"
         r"(?:目前|当前|暂时|暂|实际|其实|完全)?(?:无|没有)(?:相关)?(?:经验|经历|能力|基础)|"
         r"(?:经验|经历|能力)(?:目前|当前|实际|其实)?(?:并无|没有|为无)|"
         r"缺乏(?:经验|基础|实践|能力)?|零经验|无关|不足|否)|"
         r"(?:(?:experience[:=\-]?)?(?:no|none|zero|n/?a|false|denied|not|never|"
-        r"absent|lacking)|notused|notfamiliar|notapplicable|notlearned|neverused|"
+        r"absent|lacking)|notused|notadopted|notdeployed|notselected|notfamiliar|"
+        r"notapplicable|notlearned|neverused|neveradopted|neverdeployed|neverselected|"
         r"(?:is|are|was|were|has|have|had)(?:currently|actually|really|completely|definitely)?"
         r"(?:never|not(?!only))(?:currently|actually|really|completely|definitely)?(?:been)?"
-        r"(?:used|applied|learned|known|familiar|mastered)|"
+        r"(?:used|applied|adopted|deployed|selected|chosen|learned|known|familiar|mastered)|"
         r"(?:is|are|was|were)(?:currently|actually|really|completely|definitely)?"
         r"(?:unfamiliar|unknown|unmastered)|"
         r"(?:currently|actually|really|completely|definitely)?(?:has|have|had)"
         r"(?:currently|actually|really|completely|definitely)?(?:no|zero)"
         r"(?:relevant)?(?:experience|knowledge|skill)|"
         r"(?:wasnt|werent|isnt|arent|hasnt|havent|hadnt)(?:been)?"
-        r"(?:used|applied|learned|known|familiar|mastered))",
+        r"(?:used|applied|adopted|deployed|selected|chosen|learned|known|familiar|mastered))",
         suffix.lstrip(":-="),
         re.I,
     )
-    return negative_prefix is None and negative_suffix is None
+    return negative_prefix is None and long_negative_prefix is None and negative_suffix is None
 
 
 def graduation_year_is_grounded(value: int, raw_text: str) -> bool:
@@ -573,17 +873,25 @@ _RECORD_DURATION_PATTERN = re.compile(
     re.I,
 )
 _RECORD_LEADING_BULLET = re.compile(r"^\s*(?:[-*+\u2022\u25cf\u25aa\u25e6]|\d+[.)\u3001])\s+")
-_RECORD_CONTINUATION_PREFIX = re.compile(
-    r"^\s*(?:(?:\u8d1f\u8d23|\u4f7f\u7528|\u5b9e\u73b0|\u5b8c\u6210|\u4f18\u5316|\u63d0\u5347|\u964d\u4f4e|\u5f00\u53d1|\u8bbe\u8ba1|\u7ef4\u62a4|\u53c2\u4e0e|\u6784\u5efa|\u90e8\u7f72|\u901a\u8fc7)|"
-    r"(?:responsible|built|developed|implemented|designed|used|created|improved|"
-    r"reduced|deployed|maintained|integrated|migrated|tested|analyzed|led|owned)\b)",
-    re.I,
-)
 _RECORD_IDENTITY_PAIR = re.compile(
     r"(?:\u516c\u53f8|\u96c6\u56e2|\u5927\u5b66|\u5b66\u9662|\u5b66\u6821|\u5b9e\u9a8c\u5ba4|\u56e2\u961f|\u90e8\u95e8)"
     r".{0,96}(?:\u5e73\u53f0|\u7cfb\u7edf|\u9879\u76ee|\u670d\u52a1|\u4e2d\u5fc3|\u5de5\u5177)|"
     r"\b(?:company|corp(?:oration)?|inc|ltd|laboratory|lab|university|college)\b"
     r".{0,96}\b(?:project|platform|system|service|tool)\b",
+    re.I,
+)
+_RECORD_HEADER_ROLE_PATTERN = re.compile(
+    r"^(?:(?:独立|后端|前端|全栈|软件|系统|平台|安全|运维|测试|算法|数据|研发|技术)?"
+    r"(?:开发者|工程师|实习生)|项目负责人|技术负责人|开发负责人|负责人|维护者|贡献者|"
+    r"(?:independent\s+)?developer|owner|lead|maintainer|contributor|"
+    r"(?:backend|frontend|full[-\s]?stack|software|systems?|platform|security|devops|"
+    r"site reliability|qa|test|data|ml|ai)?\s*(?:engineer|intern)|architect|manager)\b",
+    re.I,
+)
+_RECORD_HEADER_CATEGORY_PATTERN = re.compile(
+    r"^(?:个人项目|课程设计|课程项目|课设|开源项目|毕业设计|实习项目)|"
+    r"^(?:personal\s+project|course\s+project|open[-\s]+source\s+project|"
+    r"internship\s+project)\b",
     re.I,
 )
 
@@ -605,10 +913,26 @@ def _anchor_is_on_line(anchor: str, line: str) -> bool:
     return bool(re.search(r"(?<!\w)" + escaped + r"(?!\w)", normalize_text(line)))
 
 
-def _scope_has_all_anchors(scope: str, anchors: Sequence[str]) -> bool:
+def _scope_has_all_anchors(
+    scope: str,
+    anchors: Sequence[str],
+    heading_pattern: re.Pattern[str],
+    *,
+    follows_target_heading: bool,
+) -> bool:
     lines = scope.splitlines()
-    return bool(anchors) and all(
-        any(_anchor_is_on_line(anchor, line) for line in lines) for anchor in anchors
+    return (
+        bool(anchors)
+        and any(
+            _line_can_start_record(
+                line,
+                anchors,
+                heading_pattern,
+                follows_target_heading=follows_target_heading and index == 0,
+            )
+            for index, line in enumerate(lines)
+        )
+        and all(any(_anchor_is_on_line(anchor, line) for line in lines) for anchor in anchors)
     )
 
 
@@ -616,8 +940,101 @@ def _record_line_content(line: str) -> str:
     return _RECORD_LEADING_BULLET.sub("", line.strip())
 
 
-def _is_record_continuation(line: str) -> bool:
-    return _RECORD_CONTINUATION_PREFIX.match(_record_line_content(line)) is not None
+def _has_explicit_record_header_cues(line: str) -> bool:
+    content = _record_line_content(line)
+    return bool(
+        re.search(r"[|\uff5c\t]", content)
+        and (_RECORD_DURATION_PATTERN.search(content) or _RECORD_YEAR_PATTERN.search(content))
+    )
+
+
+def _record_anchor_is_whole_line(line: str, anchor: str) -> bool:
+    content = _record_line_content(line)
+    content = re.sub(r"^#{1,6}\s*", "", content).strip()
+    content = content.strip("*_`").strip()
+    return normalize_text(content).strip() == normalize_text(anchor).strip()
+
+
+def _record_anchor_start_match(line: str, anchor: str) -> re.Match[str] | None:
+    content = normalize_text(_record_line_content(line)).strip()
+    normalized_anchor = normalize_text(anchor).strip()
+    escaped = re.escape(normalized_anchor).replace(r"\ ", r"\s+")
+    return re.match(rf"^{escaped}(?!\w)", content) if normalized_anchor else None
+
+
+def _record_anchor_starts_line(line: str, anchor: str) -> bool:
+    return _record_anchor_start_match(line, anchor) is not None
+
+
+def _is_date_anchor(anchor: str) -> bool:
+    normalized = normalize_text(anchor).strip()
+    return bool(
+        _RECORD_DURATION_PATTERN.fullmatch(normalized) or _RECORD_YEAR_PATTERN.fullmatch(normalized)
+    )
+
+
+def _record_anchor_has_header_like_remainder(line: str, anchors: Sequence[str]) -> bool:
+    content = normalize_text(_record_line_content(line)).strip()
+    anchor_match = _record_anchor_start_match(line, anchors[0])
+    if anchor_match is None:
+        return False
+    remainder = content[anchor_match.end() :].lstrip(" \t:|/.-")
+    if any(
+        not _is_date_anchor(anchor) and _record_anchor_starts_line(remainder, anchor)
+        for anchor in anchors[1:]
+    ):
+        return True
+    if _RECORD_HEADER_CATEGORY_PATTERN.match(remainder):
+        return True
+    if _RECORD_DURATION_PATTERN.match(remainder) or _RECORD_YEAR_PATTERN.match(remainder):
+        return True
+    role_match = _RECORD_HEADER_ROLE_PATTERN.match(remainder)
+    if role_match is None:
+        return False
+    tail = remainder[role_match.end() :].lstrip()
+    return bool(
+        not tail
+        or re.match(r"^[|:/.-]", tail)
+        or _RECORD_DURATION_PATTERN.match(tail)
+        or _RECORD_YEAR_PATTERN.match(tail)
+        or _RECORD_HEADER_CATEGORY_PATTERN.match(tail)
+    )
+
+
+def _record_anchor_follows_inline_heading(
+    line: str,
+    anchor: str,
+    heading_pattern: re.Pattern[str],
+) -> bool:
+    content = normalize_text(_record_line_content(line)).strip()
+    normalized_anchor = normalize_text(anchor).strip()
+    escaped = re.escape(normalized_anchor).replace(r"\ ", r"\s+")
+    anchor_match = re.search(rf"(?<!\w){escaped}(?!\w)", content)
+    if anchor_match is None:
+        return False
+    heading_matches = tuple(heading_pattern.finditer(content[: anchor_match.start()]))
+    if not heading_matches:
+        return False
+    between = content[heading_matches[-1].end() : anchor_match.start()]
+    return re.fullmatch(r"[\s:|/\-.]*", between) is not None
+
+
+def _line_can_start_record(
+    line: str,
+    anchors: Sequence[str],
+    heading_pattern: re.Pattern[str],
+    *,
+    follows_target_heading: bool = False,
+) -> bool:
+    if not anchors or not _anchor_is_on_line(anchors[0], line):
+        return False
+    return (
+        _has_explicit_record_header_cues(line)
+        or _record_anchor_is_whole_line(line, anchors[0])
+        or (follows_target_heading and _record_anchor_starts_line(line, anchors[0]))
+        or _record_anchor_has_header_like_remainder(line, anchors)
+        or _record_anchor_follows_inline_heading(line, anchors[0], heading_pattern)
+    )
 
 
 def _looks_like_record_header(line: str, *, preceded_by_blank: bool) -> bool:
@@ -626,22 +1043,16 @@ def _looks_like_record_header(line: str, *, preceded_by_blank: bool) -> bool:
     stripped = line.strip()
     if not stripped:
         return False
-    is_bullet = _RECORD_LEADING_BULLET.match(stripped) is not None
     content = _record_line_content(stripped)
     has_duration = _RECORD_DURATION_PATTERN.search(content) is not None
     has_year = _RECORD_YEAR_PATTERN.search(content) is not None
     has_separator = bool(re.search(r"[|\uff5c\t]", content))
     has_identity_pair = _RECORD_IDENTITY_PAIR.search(content) is not None
-    is_continuation = _is_record_continuation(content)
     without_dates = _RECORD_DURATION_PATTERN.sub("", content)
     without_dates = _RECORD_YEAR_PATTERN.sub("", without_dates)
     has_identity_text = bool(re.search(r"[A-Za-z\u4e00-\u9fff]", without_dates))
-    weak_header = has_duration or (has_separator and not is_bullet) or (has_year and not is_bullet)
-    return (
-        has_identity_text
-        and not is_continuation
-        and (has_identity_pair or (preceded_by_blank and weak_header))
-    )
+    explicit_header = preceded_by_blank and has_separator and (has_duration or has_year)
+    return has_identity_text and (explicit_header or has_identity_pair)
 
 
 def record_collection_scopes(
@@ -717,13 +1128,28 @@ def record_collection_scopes(
                 index
                 for index in primary_occurrences
                 if all(_anchor_is_on_line(anchor, line_values[index]) for anchor in anchors)
-                and not _is_record_continuation(line_values[index])
+                and _line_can_start_record(
+                    line_values[index],
+                    anchors,
+                    heading_pattern,
+                    follows_target_heading=bool(target_headings) and index == region_start,
+                )
             ]
-            record_starts = (strong_occurrences or primary_occurrences)[:1]
+            valid_primary_occurrences = [
+                index
+                for index in primary_occurrences
+                if _line_can_start_record(
+                    line_values[index],
+                    anchors,
+                    heading_pattern,
+                    follows_target_heading=bool(target_headings) and index == region_start,
+                )
+            ]
+            record_starts = (strong_occurrences or valid_primary_occurrences)[:1]
             for index in record_starts:
                 candidate_starts.setdefault(index, False)
 
-    spans: list[tuple[str, bool]] = []
+    spans: list[tuple[str, bool, bool]] = []
     for region_start, region_end in regions:
         starts = sorted(index for index in candidate_starts if region_start <= index < region_end)
         for position, start_index in enumerate(starts):
@@ -732,7 +1158,13 @@ def record_collection_scopes(
             end_offset = offsets[end_index] if end_index < len(offsets) else len(raw_text)
             scope = raw_text[start_offset:end_offset].strip()
             if scope:
-                spans.append((scope, candidate_starts[start_index]))
+                spans.append(
+                    (
+                        scope,
+                        candidate_starts[start_index],
+                        bool(target_headings) and start_index == region_start,
+                    )
+                )
 
     violations: set[AuditViolation] = set()
     scope_indexes: list[int | None] = []
@@ -744,8 +1176,13 @@ def record_collection_scopes(
             continue
         matches = [
             scope_index
-            for scope_index, (scope, _) in enumerate(spans)
-            if _scope_has_all_anchors(scope, anchors)
+            for scope_index, (scope, _, follows_target_heading) in enumerate(spans)
+            if _scope_has_all_anchors(
+                scope,
+                anchors,
+                heading_pattern,
+                follows_target_heading=follows_target_heading,
+            )
         ]
         if len(matches) == 1:
             scope_indexes.append(matches[0])
@@ -774,9 +1211,12 @@ def record_collection_scopes(
             )
             scope_indexes[record_index] = None
 
-    if target_headings and any(
+    has_claimed_explicit_header = any(
+        scope_index < len(spans) and spans[scope_index][1] for scope_index in claimed
+    )
+    if (target_headings or has_claimed_explicit_header) and any(
         is_explicit_header and scope_index not in claimed
-        for scope_index, (_, is_explicit_header) in enumerate(spans)
+        for scope_index, (_, is_explicit_header, _) in enumerate(spans)
     ):
         violations.add(AuditViolation("raw_record_not_mapped", collection_pointer))
 

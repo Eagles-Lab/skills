@@ -70,12 +70,19 @@ jobs:
           done
 
       - name: Check synchronized public contracts
-        run: uv run --isolated --no-project --python 3.13.13 python tools/check_resume_analyzer_contracts.py
+        run: >-
+          uv run --isolated --no-project --python 3.13.13 --with 'PyYAML>=6,<7'
+          python tools/check_resume_analyzer_contracts.py
+
+      - name: Test public contract checker
+        run: >-
+          uv run --isolated --no-project --python 3.13.13 --with 'PyYAML>=6,<7'
+          python tools/tests/test_check_resume_analyzer_contracts.py
 
       - name: Check local Markdown links
         run: uv run --isolated --no-project --python 3.13.13 python tools/check_markdown_links.py
 
       - name: Check installed CLI help surfaces
         run: >-
-          uv run --isolated --no-project --python 3.13.13 python
+          uv run --isolated --no-project --python 3.13.13 --with 'PyYAML>=6,<7' python
           tools/check_resume_analyzer_contracts.py --check-cli-help

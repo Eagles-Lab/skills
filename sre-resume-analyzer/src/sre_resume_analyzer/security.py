@@ -43,12 +43,23 @@ _MOBILE_PHONE = re.compile(r"(?<!\d)(?:\+?86[- ]?)?1[3-9]\d{9}(?!\d)")
 OMITTED_CONTACT_TEXT = "[contact omitted]"
 
 
+def _normalized_instruction_text(text: str) -> str:
+    normalized = unicodedata.normalize("NFKC", str(text)).lower()
+    return re.sub(r"\s+", " ", normalized).strip()
+
+
+def is_strong_instruction_like(text: str) -> bool:
+    """Detect a direct instruction even when it is split across adjacent lines."""
+
+    normalized = _normalized_instruction_text(text)
+    return any(pattern.search(normalized) for pattern in _STRONG_PATTERNS)
+
+
 def is_instruction_like(text: str) -> bool:
     """Detect direct attempts to control an analyzer rather than resume evidence."""
 
-    normalized = unicodedata.normalize("NFKC", str(text)).lower()
-    normalized = re.sub(r"\s+", " ", normalized).strip()
-    if any(pattern.search(normalized) for pattern in _STRONG_PATTERNS):
+    normalized = _normalized_instruction_text(text)
+    if is_strong_instruction_like(normalized):
         return True
     return sum(bool(pattern.search(normalized)) for pattern in _SIGNAL_PATTERNS) >= 2
 

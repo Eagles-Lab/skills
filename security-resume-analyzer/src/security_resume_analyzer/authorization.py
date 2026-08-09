@@ -6,10 +6,29 @@ import re
 import unicodedata
 from typing import Any
 
+_CN_ACTION_TARGET_OBJECT = (
+    r"(?:目标|网站|系统|网络|服务器|主机|设备|环境|数据库|应用|API|接口|服务|集群|"
+    r"基础设施|资产|账号|账户|云账号|云账户|Kubernetes\s*集群|K8s\s*集群)"
+)
+_EN_ACTION_TARGET_OBJECT = (
+    r"(?:target|website|site|system|network|server|host|device|environment|database|db|"
+    r"cloud\s+account|accounts?|kubernetes\s+clusters?|k8s\s+clusters?|application|app|"
+    r"api|service|cluster|infrastructure|asset)"
+)
+
 _EXPLICIT_UNAUTHORIZED = re.compile(
     r"(?:未授权|未经授权)(?:的)?(?:渗透|安全)?(?:测试|攻击|入侵|扫描|利用)|"
     r"(?:未授权|未经授权)(?:访问|攻击|入侵)(?:外部|他人|第三方)"
     r"(?:网站|系统|目标|网络|服务器)|"
+    r"(?:攻击|扫描|入侵|渗透(?:测试)?|测试|访问|利用)(?:了)?"
+    r"(?:未授权|未经授权|未获授权|未批准|未经批准|未获批准|未获许可|未经许可)"
+    rf"(?:的)?(?:外部|他人|第三方)?\s*{_CN_ACTION_TARGET_OBJECT}|"
+    r"(?:对)?(?:未授权|未经授权|未获授权|未批准|未经批准|未获批准|未获许可|未经许可)"
+    r"(?:的)?"
+    rf"(?:外部|他人|第三方)?\s*{_CN_ACTION_TARGET_OBJECT}"
+    r"(?:进行|开展)?(?:攻击|扫描|入侵|渗透(?:测试)?|测试|访问|利用)|"
+    r"擅自(?:对)?[^。！？!?；;，,\n]{0,16}(?:攻击|扫描|入侵|渗透(?:测试)?|测试|访问|利用)|"
+    r"擅自(?:攻击|扫描|入侵|渗透(?:测试)?|测试|访问|利用)|"
     r"没有授权|无授权|不具备授权|越权攻击|入侵他人|非法攻击|黑产|"
     r"(?:尚未|还未|并未|从未|没有|未能|无法|未成功|未)"
     r"(?:获|获得|取得|得到)(?:了)?(?:书面|客户|正式)?授权|"
@@ -21,12 +40,17 @@ _EXPLICIT_UNAUTHORIZED = re.compile(
     r"(?:external|third[- ]party|client|target))|illegal hacking|permission denied|"
     r"(?:not|never)\s+(?:(?:an?|client)[- ]*)?authori[sz]ed|"
     r"non[- ]authori[sz]ed|"
-    r"(?:without|no)\s+(?:(?:written|client)\s+)?(?:permission|authori[sz]ation)"
+    r"(?:without|no)\s+(?:(?:written|client)\s+)?"
+    r"(?:permission|authori[sz]ation|approval|consent)"
     r"(?:\s+for)?|"
     r"(?:did\s+not|never|not|failed\s+to)\s+(?:obtain|obtained|receive|received|"
     r"get|got)\s+(?:(?:written|client)\s+)?(?:permission|authori[sz]ation)|"
     r"(?:permission|authori[sz]ation)(?:\s+request)?\s+(?:was\s+|is\s+)?"
-    r"(?:denied|rejected|not\s+granted))\b",
+    r"(?:denied|rejected|not\s+granted)|"
+    r"(?:attack(?:ed|ing)?|scan(?:ned|ning)?|hack(?:ed|ing)?|intrud(?:e|ed|ing)|"
+    r"exploit(?:ed|ing)?|pentest(?:ed|ing)?|test(?:ed|ing)?)\s+(?:an?\s+)?"
+    r"(?:unauthori[sz]ed|unapproved|unpermitted|non[- ]permitted)\s+"
+    rf"{_EN_ACTION_TARGET_OBJECT})\b",
     re.I,
 )
 _UNAUTHORIZED_ACTIVITY_DISCLAIMER = re.compile(
@@ -35,17 +59,56 @@ _UNAUTHORIZED_ACTIVITY_DISCLAIMER = re.compile(
     r"(?:项目|经历|实践|工作)?(?:的)?内容|"
     r"(?:项目|经历|实践|工作)(?:内容)?(?:不包含|不涉及|未进行|未开展)"
     r"(?:未授权|未经授权)(?:的)?(?:渗透|安全)?(?:测试|攻击|入侵|扫描|利用)|"
-    r"\bunauthori[sz]ed\s+(?:penetration\s+test(?:ing)?|pentest(?:ing)?|"
+    r"(?:攻击|扫描|入侵|渗透(?:测试)?|测试|访问|利用)(?:了)?"
+    r"(?:未授权|未经授权|未获授权|未批准|未经批准|未获批准|未获许可|未经许可)"
+    r"(?:的)?"
+    rf"(?:外部|他人|第三方)?\s*{_CN_ACTION_TARGET_OBJECT}"
+    r"(?:不作为|不是|不属于|不在|未纳入|不包含|不涉及)(?:本|该)?"
+    r"(?:项目|经历|实践|工作)?(?:的)?内容|"
+    r"(?:项目|经历|实践|工作)(?:内容)?(?:不包含|不涉及|未进行|未开展)"
+    r"(?:攻击|扫描|入侵|渗透(?:测试)?|测试|访问|利用)(?:了)?"
+    r"(?:未授权|未经授权|未获授权|未批准|未经批准|未获批准|未获许可|未经许可)"
+    r"(?:的)?"
+    rf"(?:外部|他人|第三方)?\s*{_CN_ACTION_TARGET_OBJECT}|"
+    r"擅自(?:攻击|扫描|入侵|渗透(?:测试)?|测试|访问|利用)"
+    r"[^。！？!?；;，,\n]{0,24}(?:不作为|不是|不属于|不在|未纳入|不包含|不涉及)"
+    r"(?:本|该)?(?:项目|经历|实践|工作)?(?:的)?内容|"
+    r"(?:项目|经历|实践|工作)(?:内容)?(?:不包含|不涉及|未进行|未开展)"
+    r"擅自(?:攻击|扫描|入侵|渗透(?:测试)?|测试|访问|利用)[^。！？!?；;，,\n]{0,24}|"
+    r"\b(?:unauthori[sz]ed\s+(?:penetration\s+test(?:ing)?|pentest(?:ing)?|"
     r"security\s+test(?:ing)?|attack|scan(?:ning)?|exploit(?:ation)?|hacking)"
     r"\s+(?:was\s+|is\s+|were\s+|are\s+)?not\s+"
-    r"(?:part\s+of|included\s+in|performed|conducted)\b",
+    r"(?:part\s+of|included\s+in|performed|conducted)|"
+    r"(?:attack(?:ed|ing)?|scan(?:ned|ning)?|hack(?:ed|ing)?|intrud(?:e|ed|ing)|"
+    r"exploit(?:ed|ing)?|pentest(?:ed|ing)?|test(?:ed|ing)?)\s+(?:an?\s+)?"
+    r"(?:unauthori[sz]ed|unapproved|unpermitted|non[- ]permitted)\s+"
+    rf"{_EN_ACTION_TARGET_OBJECT}\s+"
+    r"(?:was\s+|is\s+|were\s+|are\s+)?not\s+(?:part\s+of|included\s+in|performed|conducted)|"
+    r"(?:attack(?:ed|ing)?|scan(?:ned|ning)?|hack(?:ed|ing)?|intrud(?:e|ed|ing)|"
+    r"exploit(?:ed|ing)?|pentest(?:ed|ing)?|test(?:ed|ing)?)"
+    r"[^.;,!\n]{0,32}\bwithout\s+(?:approval|consent)\b[^.;,!\n]{0,16}"
+    r"(?:was\s+|is\s+|were\s+|are\s+)?not\s+(?:part\s+of|included\s+in|performed|conducted)"
+    r")\b",
+    re.I,
+)
+_DEFENSIVE_UNAUTHORIZED_ACTIVITY_FINDING = re.compile(
+    r"(?:测试|验证|检测|编写|调试)[^。！？!?;；，,\n]{0,16}"
+    r"(?:未授权|未经授权|未获授权)(?:的)?"
+    r"(?:设备|终端|用户|账号|主机|客户端)?(?:接入|访问|登录|连接|调用)?"
+    r"(?:的)?(?:告警|检测|监控)(?:规则|策略)|"
+    r"\b(?:test(?:ed|ing)?|validat(?:ed|ing)?|detect(?:ed|ing)?|"
+    r"writ(?:e|ing)|debug(?:ged|ging)?)\b[^.;,!\n]{0,32}"
+    r"\bunauthori[sz]ed\s+(?:device|endpoint|user|account|host|client)\s+"
+    r"(?:access|login|connection)?\s*(?:alert|detection|monitoring)\s+(?:rule|policy)\b",
     re.I,
 )
 _ABSENCE_OR_NEGATION = re.compile(
     r"未参与|未参加|未做|未进行|未开展|未实施|未完成|未接触|未在|不在|"
     r"不涉及|不属于|不是|并非|非(?=靶场|CTF)|"
     r"无关|暂无|尚无|无经验|没有经验|从未参加|从未参与|经验(?:为|是)?无|零经验|"
-    r"范围(?:外|以外|之外)|未确认|不明|不确定|尚不清楚|"
+    r"范围(?:外|以外|之外)|"
+    r"(?:授权|许可|漏洞赏金)(?:信息|状态|范围|目标)?"
+    r"(?:未确认|不明|不确定|尚不清楚)|"
     r"(?:没有|无|尚无)\s*(?:CTF|靶场|安全实验(?:室|环境)|漏洞赏金|授权测试)\s*"
     r"(?:经验|经历|实践)?|"
     r"(?:CTF|靶场|安全实验(?:室|环境)|漏洞赏金|授权测试)\s*(?:经验|经历)?\s*"
@@ -59,15 +122,25 @@ _ABSENCE_OR_NEGATION = re.compile(
     re.I,
 )
 _PENDING_OR_HYPOTHETICAL = re.compile(
-    r"讨论|询问|咨询|等待|待确认|需确认|需要确认|尚待确认|待批准|待授权|缺失|未定义|"
+    r"(?:讨论|询问|咨询|等待)[^。！？!?;；，,\n]{0,16}(?:授权|许可)|"
+    r"(?:授权|许可)(?:信息|状态|范围)?"
+    r"(?:待确认|需确认|需要确认|尚待确认|待批准|待授权|缺失|未定义)|"
+    r"(?:待确认|需确认|需要确认|尚待确认|待批准|待授权)"
+    r"[^。！？!?;；，,\n]{0,16}(?:授权|许可)|"
+    r"(?:不确定|不明|尚不清楚)[^。！？!?;；，,\n]{0,16}(?:授权|许可)|"
     r"是否(?:在)?授权|(?:如果|若|假设|假定|可能|也许|声称)[^。！？!?；;，,\n]{0,16}授权|"
     r"(?:计划|准备|希望|拟|将|想)[^。！？!?；;，,\n]{0,16}"
     r"(?:参加|参与|演练|测试|CTF|靶场|漏洞赏金|授权)|"
     r"可能(?:获得|取得)?授权|也许(?:获得|取得)?授权|计划(?:获得|申请)?授权|"
     r"(?:一旦|待|预计|预期|有望|假如|倘若)(?:获得|取得|得到)?授权|"
     r"申请授权|寻求授权|希望获得授权|"
-    r"\b(?:discuss(?:ed|ing)?|ask(?:ed|ing)?|question(?:ed|ing)?|wait(?:ed|ing)?|"
-    r"pending|to be confirmed|needs? confirmation|missing|undefined|may obtain|"
+    r"\b(?:authori[sz]ation|permission)(?:\s+(?:scope|status|information))?\s+"
+    r"(?:pending|to be confirmed|needs? confirmation|missing|undefined)\b|"
+    r"\b(?:unclear|unknown|uncertain|unconfirmed)\b[^.;,!\n]{0,32}"
+    r"\b(?:whether\s+)?(?:authori[sz]ed|approved|permitted|authori[sz]ation|permission)\b|"
+    r"\b(?:(?:discuss(?:ed|ing)?|ask(?:ed|ing)?|question(?:ed|ing)?|wait(?:ed|ing)?|"
+    r"pending|to be confirmed|needs? confirmation|missing|undefined)"
+    r"[^.;,!\n]{0,48}(?:authori[sz]ation|permission)|may obtain|"
     r"might obtain|could obtain|plan(?:ned|ning)? to obtain|seek(?:ing)?|"
     r"request(?:ed|ing)? authorization|"
     r"(?:if|suppos(?:e|ed|ing)|assuming|allegedly|claimed)\b[^.;,!\n]{0,48}"
@@ -82,6 +155,30 @@ _GLOBAL_AUTHORIZATION_DENIAL = re.compile(
     r"(?:许可|授权)(?:的)?(?:测试|目标)?范围"
     r"(?:尚未|还未|未|没有|不|尚不|待|尚待)(?:明确|确认|清楚|确定|定义)|"
     r"(?:许可|授权)(?:的)?(?:测试|目标)?范围(?:不明|未知|不确定)|"
+    r"(?:许可|授权)(?:的)?(?:当前|目前)?(?:是否|能否)?"
+    r"(?:已经|已|正式|当前|仍然?)?(?:生效|有效)(?:与否)?"
+    r"(?:(?:尚未|还未|未)(?:确认|明确|确定)|"
+    r"(?:不|尚不)(?:明确|清楚|确定)|不确定|未知|待确认|尚待确认)|"
+    r"(?:(?:尚未|还未|未)(?:确认|明确|确定)|"
+    r"(?:不|尚不)(?:明确|清楚|确定)|不确定|未知|待确认|尚待确认)"
+    r"[^\u3002！？!?;；，,\n]{0,16}(?:许可|授权)(?:的)?(?:是否|能否)?"
+    r"(?:已经|已|正式|当前|仍然?)?(?:生效|有效)|"
+    r"(?:允许|获准|批准)(?:进行|开展)?(?:安全|渗透)?(?:测试|评估|扫描|攻击)?"
+    r"(?:(?:到|至)?(?:哪里|何处|什么范围|哪些目标|什么目标)|(?:的)?(?:范围|边界))"
+    r"(?:(?:尚未|还未|未)(?:确认|明确|确定)|"
+    r"(?:不|尚不)(?:明确|清楚|确定)|不确定|未知|待确认|尚待确认|"
+    r"(?:无法|不能|难以)(?:确认|明确|确定))|"
+    r"(?:许可|授权)(?:的)?(?:测试|目标)?"
+    r"(?:范围|边界|法律效力|效力|有效性|生效状态)"
+    r"(?:(?:尚未|还未|未)(?:确认|明确|确定)|"
+    r"(?:不|尚不)(?:明确|清楚|确定)|不确定|未知|待确认|尚待确认|"
+    r"(?:无法|不能|难以)(?:确认|明确|确定))|"
+    r"(?:无法|不能|难以)(?:确认|明确|确定)"
+    r"[^\u3002！？!?;；，,\n]{0,16}(?:许可|授权)(?:的)?(?:测试|目标)?"
+    r"(?:范围|边界|法律效力|效力|有效性|生效状态)?|"
+    r"(?:无法|不能|难以)(?:确认|明确|确定)"
+    r"[^\u3002！？!?;；，,\n]{0,8}(?:允许|获准|批准)(?:进行|开展)?"
+    r"(?:安全|渗透)?(?:测试|评估|扫描|攻击)?(?:到|至)?(?:哪里|何处|什么范围|哪些目标|什么目标)|"
     r"(?:该|此|这个|上述)?目标(?:并未|尚未|还未|未|没有|不曾)"
     r"(?:获准|获批|被授权|得到许可)(?:进行|开展)?(?:安全|渗透)?(?:测试|评估|扫描|攻击)?|"
     r"(?:并未|尚未|还未|未|没有|不曾)(?:获准|获批|被授权|得到许可)"
@@ -122,6 +219,18 @@ _GLOBAL_AUTHORIZATION_DENIAL = re.compile(
     r"\b(?:authorization|permission|approved)\s+scope\s+"
     r"(?:is\s+|was\s+|had\s+been\s+|remains?\s+)?(?:unclear|undefined|unknown|ambiguous|"
     r"not\s+(?:specified|defined|confirmed|clear))\b|"
+    r"\b(?:unable\s+to|cannot|can't)\s+(?:confirm|determine|clarify)\s+"
+    r"(?:the\s+)?(?:authorization|permission)(?:\s+(?:scope|boundary|validity|"
+    r"effectiveness|legal\s+validity|effective\s+status))?\b|"
+    r"\b(?:authorization|permission)\s+(?:scope|boundary|validity|effectiveness|"
+    r"legal\s+validity|effective\s+status)\s+"
+    r"(?:is\s+|was\s+|remains?\s+)?(?:uncertain|unclear|unknown|unconfirmed|"
+    r"pending\s+confirmation|cannot\s+be\s+confirmed)\b|"
+    r"\b(?:legal\s+)?(?:validity|effectiveness)\s+of\s+(?:the\s+)?"
+    r"(?:authorization|permission)\s+(?:is\s+|was\s+|remains?\s+)?"
+    r"(?:uncertain|unclear|unknown|unconfirmed|pending\s+confirmation)\b|"
+    r"\b(?:unclear|unknown|uncertain)\s+(?:how\s+far|where|which\s+targets?)\s+"
+    r"(?:testing\s+)?(?:is\s+|was\s+|may\s+be\s+)?permitted\b|"
     r"\b(?:authorization|permission)\s+(?:does\s+not|did\s+not|doesn't|didn't)\s+"
     r"(?:cover|include)\s+(?:this|that|the)\s+target\b|"
     r"\b(?:authorization|permission)\s+(?:(?:has|had)\s+not\s+(?:yet\s+)?"
@@ -140,6 +249,16 @@ _GLOBAL_AUTHORIZATION_DENIAL = re.compile(
     r"not[- ]yet[- ]effective)\s+(?:(?:written|client)\s+)?"
     r"(?:authorization|permission)\b(?=[^.;,!\n]{0,32}"
     r"(?:test|assessment|scan|exploit|attack|after)|[.;,!\n]|$)|"
+    r"\b(?:whether\s+(?:the\s+)?)?(?:authorization|permission)\s+"
+    r"(?:is\s+|was\s+|remains?\s+)?(?:effective|valid)\s+"
+    r"(?:is\s+|was\s+|remains?\s+)?"
+    r"(?:uncertain|unclear|unknown|unconfirmed|not\s+(?:confirmed|clear|certain))\b|"
+    r"\b(?:authorization|permission)\s+(?:effectiveness|validity|effective\s+status)\s+"
+    r"(?:is\s+|was\s+|remains?\s+)?"
+    r"(?:uncertain|unclear|unknown|unconfirmed|not\s+(?:confirmed|clear|certain))\b|"
+    r"\b(?:uncertain|unclear|unknown|unconfirmed|not\s+(?:confirmed|clear|certain))\s+"
+    r"whether\s+(?:the\s+)?(?:authorization|permission)\s+"
+    r"(?:is\s+|was\s+|remains?\s+)?(?:effective|valid)\b|"
     r"\b(?:authorization|permission)\s+(?:period\s+)?(?:has\s+|is\s+)?ended\b",
     re.I,
 )
@@ -166,6 +285,11 @@ _AUTHORIZATION_LIFECYCLE_FINDING = re.compile(
     r"[^。！？!?；;，,\n]{0,32}(?:许可|授权)(?:的)?(?:现已|已经|已)?(?:又?被)?"
     r"(?:撤销|取消|终止|过期|到期|失效|作废|废止|无效|不再有效|不再生效)"
     r"[^。！？!?；;，,\n]{0,16}(?:权限绕过|越权)?(?:漏洞|缺陷)|"
+    r"(?:复现|发现|修复|检测|识别|排查|验证|报告|披露|定位|解决|阻断|分析)"
+    r"[^。！？!?；;，,\n]{0,32}(?:许可|授权)(?:的)?"
+    r"(?:(?:法律)?(?:效力|有效性|生效状态|生效与否)|当前是否有效)"
+    r"(?:不确定|不明|未知|未确认|待确认|尚待确认)"
+    r"[^。！？!?；;，,\n]{0,16}(?:权限绕过|越权)?(?:漏洞|缺陷)|"
     r"\b(?:reproduc(?:ed|ing)?|found|fix(?:ed|ing)?|detect(?:ed|ing)?|"
     r"identif(?:ied|ying)|investigat(?:ed|ing)|report(?:ed|ing)?|disclos(?:ed|ing)|"
     r"remediat(?:ed|ing)?|analy[sz](?:ed|ing))\b"
@@ -173,13 +297,34 @@ _AUTHORIZATION_LIFECYCLE_FINDING = re.compile(
     r"(?:(?:is|was|has\s+been|had\s+been)\s+)?"
     r"(?:not\s+(?:yet\s+)?effective|revoked|expired|withdrawn|cancelled|canceled|"
     r"terminated|rescinded|lapsed|invalid|void|ineffective|no\s+longer\s+effective)"
+    r"[^.;,!\n]{0,24}\b(?:vulnerabilit(?:y|ies)|bugs?|flaws?|defects?|bypass)\b|"
+    r"\b(?:reproduc(?:ed|ing)?|found|fix(?:ed|ing)?|detect(?:ed|ing)?|"
+    r"identif(?:ied|ying)|investigat(?:ed|ing)|report(?:ed|ing)?|disclos(?:ed|ing)|"
+    r"remediat(?:ed|ing)?|analy[sz](?:ed|ing))\b"
+    r"[^.;,!\n]{0,48}\b(?:authorization|permission)\s+(?:legal\s+)?"
+    r"(?:validity|effectiveness|effective\s+status)\s+"
+    r"(?:is\s+|was\s+)?(?:uncertain|unclear|unknown|unconfirmed|pending\s+confirmation)"
     r"[^.;,!\n]{0,24}\b(?:vulnerabilit(?:y|ies)|bugs?|flaws?|defects?|bypass)\b",
     re.I,
 )
-_CONTINUED_AFTER_SCOPE_FINDING = re.compile(
+_LIFECYCLE_STATE_CHANGE_WITH_TEMPORAL_BOUNDARY = re.compile(
+    r"(?:许可|授权)[^。！？!?；;，,\n]{0,24}"
+    r"(?:撤销|取消|终止|过期|到期|失效|作废|废止|无效|不再有效|不再生效)"
+    r"[^。！？!?；;，,\n]{0,16}(?:前|之前|后|之后|时|期间|过程中)|"
+    r"\b(?:authorization|permission)\b[^.;,!\n]{0,24}"
+    r"\b(?:revoked|expired|withdrawn|cancelled|canceled|terminated|rescinded|"
+    r"lapsed|invalid|void|ineffective|no\s+longer\s+effective)\b"
+    r"[^.;,!\n]{0,20}\b(?:before|after|while|during|prior\s+to)\b",
+    re.I,
+)
+_CONTINUED_AFTER_AUTHORIZATION_FINDING = re.compile(
     r"^\s*(?:[，,;；]\s*)?(?:(?:但|并|且|后|之后|随后)\s*)?"
     r"(?:仍|仍然|继续|依然|又)\s*[^。！？!?；;，,\n]{0,16}"
-    r"(?:测试|扫描|攻击|利用|渗透|评估)|"
+    r"(?:测试|扫描|攻击|入侵|利用|渗透|评估)|"
+    r"^\s*(?:[，,;；]\s*)?(?:并|且|但(?:随后|之后)?|随后|之后)\s*"
+    r"(?:测试|扫描|攻击|入侵|利用|渗透)"
+    r"[^。！？!?；;，,\n]{0,12}(?:该|此|这个|上述|未授权|未经授权|未获授权)"
+    r"(?:目标|网站|系统|网络|服务器|主机|设备)|"
     r"^\s*(?:[,;]\s*)?(?:and\s+|but\s+|then\s+)?"
     r"(?:still\s+)?continued?\s+(?:to\s+)?"
     r"(?:test(?:ing)?|scan(?:ning)?|attack(?:ing)?|exploit(?:ing)?|assess(?:ing|ment)?)\b",
@@ -200,16 +345,20 @@ _NON_APPLIED_CONTEXT = re.compile(
 )
 _ACTIVE_PARTICIPATION = re.compile(
     r"参加|参与|完成|负责|进行|开展|实施|执行|复现|搭建|使用|"
-    r"修复|检测|分析|验证|解决|加固|排查|"
+    r"测试|攻击|扫描|利用|渗透|修复|检测|分析|验证|解决|加固|排查|"
     r"提交|入选|接受|获奖|夺得|"
-    r"\b(?:participat(?:ed|ing)|competed|completed|practiced|exercised|tested|"
+    r"\b(?:participat(?:ed|ing)|competed|completed|practiced|exercis(?:e|ed|ing)|"
     r"used|built|submitted|accepted|joined|conducted|performed|worked|reported|won|"
-    r"fix(?:ed|ing)|remediat(?:ed|ing)|resolv(?:ed|ing)|detect(?:ed|ing)|"
-    r"analy[sz](?:ed|ing)|validat(?:ed|ing))\b",
+    r"test(?:ed|ing)?|pentest(?:ed|ing)?|penetration\s+test(?:ed|ing)?|"
+    r"fix(?:ed|ing)|remediat(?:e|ed|ing)|retest(?:ed|ing)?|resolv(?:ed|ing)|"
+    r"detect(?:ed|ing)|assess(?:ed|ing)?|"
+    r"analy[sz](?:ed|ing)|validat(?:ed|ing)|solv(?:ed|ing)|captur(?:ed|ing)|"
+    r"exploit(?:ed|ing)?|scan(?:ned|ning)?|audit(?:ed|ing)?|reproduc(?:e|ed|ing)|"
+    r"attack(?:ed|ing)?|defen(?:d|ded|ding))\b",
     re.I,
 )
 _SECURITY_EXERCISE_ACTION = re.compile(
-    r"测试|演练|攻防|渗透|复现|漏洞|代码审计|安全验证|CTF|竞赛|比赛|解题|夺旗|"
+    r"测试|演练|攻防|渗透|复现|漏洞|代码审计|安全验证|解题|夺旗|"
     r"提交\s*flag|"
     r"攻击|防御|应急|取证|检测|加固|排查|扫描|利用|回归|"
     r"\b(?:test(?:ed|ing)?|exercis(?:e|ed|ing)|challenge|exploit(?:ed|ing|ation)?|"
@@ -217,6 +366,82 @@ _SECURITY_EXERCISE_ACTION = re.compile(
     r"attack(?:ed|ing)?|defen(?:d|ded|ding|se)|incident|forensic|vulnerabilit|"
     r"bugs?|flaws?|defects?|"
     r"audit(?:ed|ing)?|reproduc(?:e|ed|ing)|scan(?:ned|ning)?|remediat|retest)\b",
+    re.I,
+)
+_CTF_TECHNICAL_ACTION = re.compile(
+    r"解题|夺旗|提交\s*flag|完成(?:了)?\s*(?:CTF\s*)?(?:挑战|题目)|"
+    r"复现|漏洞|代码审计|安全验证|"
+    r"攻击|防御|应急|取证|检测|加固|排查|扫描|利用|渗透|回归|"
+    r"\b(?:(?:complet(?:e|ed|ing)|solv(?:e|ed|ing))\s+(?:a\s+)?"
+    r"(?:ctf\s+)?(?:problem|challenge)|"
+    r"flag\s+(?:capture|submission)|exploit(?:ed|ing|ation)?|pentest(?:ed|ing)?|"
+    r"penetration\s+test(?:ed|ing)?|attack(?:ed|ing)?|defen(?:d|ded|ding|se)|incident|"
+    r"forensic|vulnerabilit(?:y|ies)|bugs?|flaws?|defects?|audit(?:ed|ing)?|"
+    r"reproduc(?:e|ed|ing)|scan(?:ned|ning)?|remediat|retest)\b",
+    re.I,
+)
+_CTF_SUPPORT_WORK = re.compile(
+    r"官网|网页|页面|死链|赞助商|餐饮|票务|会务|宣传|报名系统|"
+    r"\b(?:website|web\s+pages?|dead\s+links?|sponsors?|catering|ticketing|"
+    r"event\s+logistics|promotion|registration\s+system)\b",
+    re.I,
+)
+_CTF_SECURITY_OBJECT = re.compile(
+    r"漏洞|越权|注入|攻击|渗透|利用|取证|应急|防御|恶意|端口|资产|"
+    r"主机|网络|flag|夺旗|解题|代码审计|PoC|"
+    r"\b(?:vulnerabilit(?:y|ies)|xss|ssrf|sqli|exploit|attack|forensic|incident|"
+    r"defen[cs]e|ports?|hosts?|networks?|flags?|challenges?|audit|poc)\b",
+    re.I,
+)
+_EXTERNAL_OR_PRODUCTION_TARGET = re.compile(
+    r"(?:(?:客户|外部|第三方|甲方|乙方|丙方)(?:的)?(?:生产|线上|真实业务|云)?|"
+    r"生产|线上|真实业务)"
+    r"(?:的)?\s*(?:目标|网站|系统|网络|服务器|主机|设备|环境|数据库|应用|API|"
+    r"接口|服务|集群|基础设施|资产|账号|账户|云账号|云账户|Kubernetes\s*集群|"
+    r"K8s\s*集群)|"
+    r"\b(?:(?:(?:customer|client)(?:'s|-owned)?|external|third[- ]party)"
+    r"(?:\s+(?:production|prod|live|real[- ]world|saas))?|"
+    r"production|prod|live|real[- ]world)\s+"
+    r"(?:target|website|site|system|network|server|host|device|environment|database|db|"
+    r"cloud\s+account|accounts?|kubernetes\s+clusters?|k8s\s+clusters?|application|app|"
+    r"api|service|cluster|infrastructure|asset)\b",
+    re.I,
+)
+_BOUND_EXTERNAL_TARGET_AUTHORIZATION = re.compile(
+    r"(?:(?:已)?(?:获得|取得|得到)(?:了)?|经)\s*"
+    r"(?P<cn_granted_party>甲方|乙方|丙方)(?:的)?(?:书面|正式)?授权(?:后|范围内)?"
+    r"[^。！？!?；;，,\n]{0,8}(?:进行|开展)?(?:渗透|安全)?(?:测试|评估|扫描)"
+    r"[^。！？!?；;，,\n]{0,8}(?:了)?(?:对)?(?P=cn_granted_party)(?:的)?"
+    rf"(?:生产|线上|真实业务|云)?(?:的)?\s*{_CN_ACTION_TARGET_OBJECT}|"
+    r"在\s*(?P<cn_scope_party>甲方|乙方|丙方)(?:的)?(?:书面|正式)?授权范围内"
+    r"[^。！？!?；;，,\n]{0,8}(?:进行|开展)?(?:渗透|安全)?(?:测试|评估|扫描)"
+    r"[^。！？!?；;，,\n]{0,8}(?:了)?(?:对)?(?P=cn_scope_party)(?:的)?"
+    rf"(?:生产|线上|真实业务|云)?(?:的)?\s*{_CN_ACTION_TARGET_OBJECT}|"
+    r"(?:已|经|书面|客户)?(?:获得|取得|得到)?(?:了)?(?:书面|客户|正式)?(?:许可|授权)"
+    r"(?:的|后|范围内)?[^。！？!?；;，,\n]{0,16}"
+    r"(?:(?:客户|外部|第三方|甲方|乙方|丙方)(?:的)?(?:生产|线上|真实业务|云)?|"
+    r"生产|线上|真实业务)"
+    r"(?:的)?\s*(?:目标|网站|系统|网络|服务器|主机|设备|环境|数据库|应用|API|"
+    r"接口|服务|集群|基础设施|资产|账号|账户|云账号|云账户|Kubernetes\s*集群|"
+    r"K8s\s*集群)"
+    r"[^。！？!?；;，,\n]{0,12}(?:渗透|安全)?(?:测试|评估|扫描)|"
+    r"\b(?:(?:client|customer)[- ]authori[sz]ed|authori[sz]ed|approved)\s+"
+    r"(?:(?:(?:customer|client)(?:'s|-owned)?|external|third[- ]party)"
+    r"(?:\s+(?:production|prod|live|real[- ]world|saas))?|"
+    r"(?:production|prod|live|real[- ]world))\s+"
+    r"(?:(?:target|website|site|system|network|server|host|device|environment|database|db|"
+    r"cloud\s+account|accounts?|kubernetes\s+clusters?|k8s\s+clusters?|application|app|"
+    r"api|service|cluster|infrastructure|asset)\s+)?"
+    r"(?:pentest|penetration\s+test(?:ing)?|security\s+assessment|security\s+test(?:ing)?)\b|"
+    r"\b(?:(?:client|customer)[- ]authori[sz]ed|authori[sz]ed|approved)\s+"
+    r"(?:pentest|penetration\s+test(?:ing)?|security\s+assessment|security\s+test(?:ing)?)"
+    r"\s+(?:of|on|against)\s+(?:(?:an?|the)\s+)?"
+    r"(?:(?:(?:customer|client)(?:'s|-owned)?|external|third[- ]party)"
+    r"(?:\s+(?:production|prod|live|real[- ]world|saas))?|"
+    r"(?:production|prod|live|real[- ]world))\s+"
+    r"(?:target|website|site|system|network|server|host|device|environment|database|db|"
+    r"cloud\s+account|accounts?|kubernetes\s+clusters?|k8s\s+clusters?|application|app|"
+    r"api|service|cluster|infrastructure|asset)\b",
     re.I,
 )
 _PARTICIPATION_ADMIN_ONLY = re.compile(
@@ -268,13 +493,7 @@ _NON_SECURITY_LAB = re.compile(
     r"化学|生物|物理|医学|临床|实验设备|\blab equipment\b",
     re.I,
 )
-_CTF_CONTEXT = re.compile(
-    r"(?:参加|参与|完成|负责|进行|开展|执行|举办)?\s*CTF\s*"
-    r"(?:竞赛|比赛|挑战|演练|解题|夺旗|题目|提交\s*flag)|"
-    r"\bCTF\s+(?:competition|contest|challenge|exercise|problem solving|"
-    r"flag capture|flag submission)\b",
-    re.I,
-)
+_CTF_MARKER = re.compile(r"(?<![A-Za-z0-9_])ctf(?![A-Za-z0-9_])|夺旗", re.I)
 _BUG_BOUNTY_CONTEXT = re.compile(
     r"(?:参加|参与|入选|接受|完成)(?:了|的)?(?:公开)?漏洞赏金(?:计划|项目)?|"
     r"(?:公开)?漏洞赏金(?:计划|项目)(?:中|内)|"
@@ -287,7 +506,7 @@ _CLAUSE_SPLIT = re.compile(r"[。！？!?；;，,\n]+|\b(?:but|however)\b|(?:但
 _ALLOWED_ENVIRONMENTS = frozenset({"lab", "ctf", "bug_bounty", "authorized"})
 _ENVIRONMENT_MARKERS: dict[str, re.Pattern[str]] = {
     "lab": re.compile(r"靶场|安全实验环境|安全实验室|\b(?:security|cyber)?\s*lab\b", re.I),
-    "ctf": re.compile(r"(?<![A-Za-z0-9_])ctf(?![A-Za-z0-9_])|夺旗", re.I),
+    "ctf": _CTF_MARKER,
     "bug_bounty": re.compile(r"漏洞赏金|(?<![A-Za-z0-9_])bug bounty(?![A-Za-z0-9_])", re.I),
     "authorized": re.compile(r"授权|\b(?:authori[sz]ed|authorization|permission)\b", re.I),
 }
@@ -306,14 +525,23 @@ def _clauses(text: str) -> tuple[str, ...]:
 def _mask_authorization_state_findings(text: str) -> str:
     """Remove explicit tested-system authorization findings before permission checks."""
 
-    def replacement(match: re.Match[str]) -> str:
-        following = text[match.end() : match.end() + 64]
-        if _CONTINUED_AFTER_SCOPE_FINDING.search(following):
-            return match.group(0)
-        return " "
+    def mask(pattern: re.Pattern[str], subject: str) -> str:
+        def replacement(match: re.Match[str]) -> str:
+            if (
+                pattern is _AUTHORIZATION_LIFECYCLE_FINDING
+                and _LIFECYCLE_STATE_CHANGE_WITH_TEMPORAL_BOUNDARY.search(match.group(0))
+            ):
+                return match.group(0)
+            following = subject[match.end() : match.end() + 64]
+            if _CONTINUED_AFTER_AUTHORIZATION_FINDING.search(following):
+                return match.group(0)
+            return " " * len(match.group(0))
 
-    masked = _AUTHORIZATION_SCOPE_FINDING.sub(replacement, text)
-    return _AUTHORIZATION_LIFECYCLE_FINDING.sub(replacement, masked)
+        return pattern.sub(replacement, subject)
+
+    masked = mask(_DEFENSIVE_UNAUTHORIZED_ACTIVITY_FINDING, text)
+    masked = mask(_AUTHORIZATION_SCOPE_FINDING, masked)
+    return mask(_AUTHORIZATION_LIFECYCLE_FINDING, masked)
 
 
 def _clause_is_negated_or_unconfirmed(clause: str) -> bool:
@@ -330,9 +558,16 @@ def _clause_is_only_a_mention(clause: str) -> bool:
     return bool(_NON_APPLIED_CONTEXT.search(clause) or _MERE_MENTION.search(clause))
 
 
-def _clause_has_explicit_unauthorized_activity(clause: str) -> bool:
+def _clause_has_explicit_unauthorized_activity(
+    clause: str,
+    *,
+    findings_already_masked: bool = False,
+) -> bool:
+    permission_text = (
+        clause if findings_already_masked else _mask_authorization_state_findings(clause)
+    )
     return bool(
-        _EXPLICIT_UNAUTHORIZED.search(clause)
+        _EXPLICIT_UNAUTHORIZED.search(permission_text)
         and not _UNAUTHORIZED_ACTIVITY_DISCLAIMER.search(clause)
     )
 
@@ -340,7 +575,9 @@ def _clause_has_explicit_unauthorized_activity(clause: str) -> bool:
 def has_negative_authorization_signal(text: str) -> bool:
     """Return whether text denies, lacks, or leaves authorization unconfirmed."""
 
-    return any(_clause_is_negated_or_unconfirmed(clause) for clause in _clauses(text))
+    return has_global_authorization_denial(text) or any(
+        _clause_is_negated_or_unconfirmed(clause) for clause in _clauses(text)
+    )
 
 
 def has_global_authorization_denial(text: str) -> bool:
@@ -350,7 +587,11 @@ def has_global_authorization_denial(text: str) -> bool:
     return bool(
         _GLOBAL_AUTHORIZATION_DENIAL.search(normalized)
         or any(
-            _clause_has_explicit_unauthorized_activity(clause) for clause in _clauses(normalized)
+            _clause_has_explicit_unauthorized_activity(
+                clause,
+                findings_already_masked=True,
+            )
+            for clause in _clauses(normalized)
         )
     )
 
@@ -382,42 +623,93 @@ def _positive_clauses(text: str) -> tuple[str, ...]:
 def has_explicit_completed_authorization_signal(text: str) -> bool:
     """Require completed authorization, not merely another kind of safe environment."""
 
-    return any(_EXPLICIT_AUTHORIZATION.search(clause) for clause in _positive_clauses(text))
+    clauses = _positive_clauses(text)
+    if _has_unbound_external_target_activity(clauses):
+        return False
+    return any(
+        _EXPLICIT_AUTHORIZATION.search(_mask_authorization_state_findings(clause))
+        or _BOUND_EXTERNAL_TARGET_AUTHORIZATION.search(clause)
+        for clause in clauses
+    )
+
+
+def _has_unbound_external_target_activity(clauses: tuple[str, ...]) -> bool:
+    target_classes: set[str] = set()
+    bound_classes: set[str] = set()
+    for clause in clauses:
+        for match in _EXTERNAL_OR_PRODUCTION_TARGET.finditer(clause):
+            target_classes.update(_external_target_classes(match.group(0)))
+        for match in _BOUND_EXTERNAL_TARGET_AUTHORIZATION.finditer(clause):
+            bound_classes.update(_external_target_classes(match.group(0)))
+    has_security_activity = any(
+        _ACTIVE_PARTICIPATION.search(clause) and _SECURITY_EXERCISE_ACTION.search(clause)
+        for clause in clauses
+    )
+    return has_security_activity and bool(target_classes - bound_classes)
+
+
+def _external_target_classes(value: str) -> frozenset[str]:
+    classes: set[str] = set()
+    for marker, target_class in (("甲方", "party_a"), ("乙方", "party_b"), ("丙方", "party_c")):
+        if marker in value:
+            classes.add(target_class)
+    if re.search(r"客户|\b(?:customer|client)(?:'s|-owned)?\b", value, re.I):
+        classes.add("customer")
+    if re.search(r"第三方|\bthird[- ]party\b", value, re.I):
+        classes.add("third_party")
+    if re.search(r"外部|\bexternal\b", value, re.I):
+        classes.add("external")
+    if not classes and re.search(
+        r"生产|线上|真实业务|\b(?:production|live|real[- ]world)\b", value, re.I
+    ):
+        classes.add("production")
+    return frozenset(classes)
 
 
 def has_ctf_participation_signal(text: str) -> bool:
-    """Require an affirmative CTF competition, challenge, or exercise context."""
+    """Require CTF context and concrete technical participation in the same record."""
 
-    return any(
-        _CTF_CONTEXT.search(clause)
-        and _ACTIVE_PARTICIPATION.search(clause)
-        and _SECURITY_EXERCISE_ACTION.search(clause)
+    clauses = _positive_clauses(text)
+    has_context = any(_CTF_MARKER.search(clause) for clause in clauses)
+    if _has_unbound_external_target_activity(clauses):
+        return False
+    has_technical_action = any(
+        _ACTIVE_PARTICIPATION.search(clause)
+        and _CTF_TECHNICAL_ACTION.search(clause)
         and not _PARTICIPATION_ADMIN_ONLY.search(clause)
-        for clause in _positive_clauses(text)
+        and not (_CTF_SUPPORT_WORK.search(clause) and not _CTF_SECURITY_OBJECT.search(clause))
+        for clause in clauses
     )
+    return has_context and has_technical_action
 
 
 def has_lab_participation_signal(text: str) -> bool:
     """Require an affirmative security-lab or cyber-exercise context."""
 
+    clauses = _positive_clauses(text)
+    if _has_unbound_external_target_activity(clauses):
+        return False
     return any(
         _LAB_CONTEXT.search(clause)
         and _ACTIVE_PARTICIPATION.search(clause)
         and _SECURITY_EXERCISE_ACTION.search(clause)
         and not _NON_SECURITY_LAB.search(clause)
         and not _PARTICIPATION_ADMIN_ONLY.search(clause)
-        for clause in _positive_clauses(text)
+        for clause in clauses
     )
 
 
 def has_bug_bounty_participation_signal(text: str) -> bool:
     """Require accepted or actual participation in a bug-bounty program."""
 
+    clauses = _positive_clauses(text)
+    if _has_unbound_external_target_activity(clauses):
+        return False
     return any(
         _BUG_BOUNTY_CONTEXT.search(clause)
         and _ACTIVE_PARTICIPATION.search(clause)
         and not _PARTICIPATION_ADMIN_ONLY.search(clause)
-        for clause in _positive_clauses(text)
+        for clause in clauses
     )
 
 
@@ -426,23 +718,23 @@ def has_positive_authorization_signal(text: str) -> bool:
 
     if has_global_authorization_denial(text):
         return False
-    for clause in _clauses(text):
+    clauses = _positive_clauses(text)
+    if _has_unbound_external_target_activity(clauses):
+        return False
+    if has_ctf_participation_signal(text):
+        return True
+    for clause in clauses:
         if _clause_is_negated_or_unconfirmed(clause) or _clause_is_only_a_mention(clause):
             continue
-        if _EXPLICIT_AUTHORIZATION.search(clause):
+        if _EXPLICIT_AUTHORIZATION.search(
+            _mask_authorization_state_findings(clause)
+        ) or _BOUND_EXTERNAL_TARGET_AUTHORIZATION.search(clause):
             return True
         if (
             _LAB_CONTEXT.search(clause)
             and _ACTIVE_PARTICIPATION.search(clause)
             and _SECURITY_EXERCISE_ACTION.search(clause)
             and not _NON_SECURITY_LAB.search(clause)
-            and not _PARTICIPATION_ADMIN_ONLY.search(clause)
-        ):
-            return True
-        if (
-            _CTF_CONTEXT.search(clause)
-            and _ACTIVE_PARTICIPATION.search(clause)
-            and _SECURITY_EXERCISE_ACTION.search(clause)
             and not _PARTICIPATION_ADMIN_ONLY.search(clause)
         ):
             return True

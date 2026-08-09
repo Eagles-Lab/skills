@@ -10,11 +10,18 @@ import os
 import re
 import subprocess
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+try:
+    import yaml
+except ModuleNotFoundError:
+    yaml = None  # type: ignore[assignment]
+
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = ROOT / "contracts" / "resume-analyzers.json"
+_YAML_BOOTSTRAP_ENV = "RESUME_CONTRACT_YAML_BOOTSTRAPPED"
 
 
 class ContractErrors:
@@ -32,6 +39,85 @@ def _read_text(path: Path, errors: ContractErrors) -> str:
     except (OSError, UnicodeError) as exc:
         errors.items.append(f"{path.relative_to(ROOT)}: cannot read UTF-8 text: {exc}")
         return ""
+
+
+def _rerun_with_pyyaml() -> int:
+    """Keep the documented ``python3`` entry point usable without a root environment."""
+    if os.environ.get(_YAML_BOOTSTRAP_ENV):
+        print("contract dependency error: PyYAML>=6,<7 is unavailable", file=sys.stderr)
+        return 2
+
+    environment = os.environ.copy()
+    environment[_YAML_BOOTSTRAP_ENV] = "1"
+    command = [
+        "uv",
+        "run",
+        "--isolated",
+        "--no-project",
+        "--python",
+        sys.executable,
+        "--with",
+        "PyYAML>=6,<7",
+        "python",
+        str(Path(__file__).resolve()),
+        *sys.argv[1:],
+    ]
+    try:
+        completed = subprocess.run(command, check=False, env=environment)
+    except FileNotFoundError:
+        print(
+            "contract dependency error: PyYAML is unavailable and uv was not found",
+            file=sys.stderr,
+        )
+        return 2
+    return completed.returncode
+
+
+def _check_agent_yaml(
+    text: str,
+    *,
+    label: str,
+    skill_name: str,
+    errors: ContractErrors,
+) -> None:
+    if yaml is None:
+        errors.items.append(f"{label}/agents/openai.yaml: PyYAML is unavailable")
+        return
+
+    try:
+        document = yaml.safe_load(text)
+    except yaml.YAMLError as exc:
+        errors.items.append(f"{label}/agents/openai.yaml: invalid YAML: {exc}")
+        return
+
+    if not isinstance(document, Mapping):
+        errors.items.append(f"{label}/agents/openai.yaml: root must be a mapping")
+        return
+    interface = document.get("interface")
+    if not isinstance(interface, Mapping):
+        errors.items.append(f"{label}/agents/openai.yaml: interface must be a mapping")
+        return
+
+    fields: dict[str, str] = {}
+    for field in ("display_name", "short_description", "default_prompt"):
+        value = interface.get(field)
+        if not isinstance(value, str) or not value.strip():
+            errors.items.append(
+                f"{label}/agents/openai.yaml: interface.{field} must be a non-empty string"
+            )
+            continue
+        fields[field] = value
+
+    prompt = fields.get("default_prompt")
+    if prompt is None:
+        return
+    invocation = re.compile(
+        rf"(?<![A-Za-z0-9_-])\${re.escape(skill_name)}(?![A-Za-z0-9_-])"
+    )
+    errors.require(
+        invocation.search(prompt) is not None,
+        f"{label}/agents/openai.yaml: default_prompt must invoke ${skill_name}",
+    )
 
 
 def _frontmatter(text: str) -> dict[str, str]:
@@ -143,11 +229,12 @@ def _check_analyzer(
             errors.require(relative in linked, f"{label}/SKILL.md: must directly link {relative}")
 
     agent_yaml = _read_text(directory / "agents" / "openai.yaml", errors)
-    errors.require(
-        f"${analyzer['skill_name']}" in agent_yaml,
-        f"{label}/agents/openai.yaml: default_prompt must invoke ${analyzer['skill_name']}",
+    _check_agent_yaml(
+        agent_yaml,
+        label=label,
+        skill_name=analyzer["skill_name"],
+        errors=errors,
     )
-    errors.require("default_prompt:" in agent_yaml, f"{label}/agents/openai.yaml: missing prompt")
 
     try:
         version, readme_name, scripts = _project_metadata(directory / "pyproject.toml")
@@ -279,6 +366,9 @@ def main() -> int:
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--check-cli-help", action="store_true")
     args = parser.parse_args()
+
+    if yaml is None:
+        return _rerun_with_pyyaml()
 
     try:
         manifest = json.loads(args.manifest.read_text(encoding="utf-8"))

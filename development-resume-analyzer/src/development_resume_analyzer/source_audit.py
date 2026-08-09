@@ -8,15 +8,17 @@ from typing import Any
 
 from .errors import SourceMappingAuditError
 from .models import ProjectCategory, Resume
-from .security import SECURITY_WARNING, is_instruction_like
+from .security import SECURITY_WARNING, is_instruction_like, is_strong_instruction_like
 from .source_audit_core import (
     MAX_RAW_EXTRACTION_BYTES,
     SOURCE_MAPPING_AUDIT_VERSION,
     AuditViolation,
     FactClaim,
+    RawExtraction,
     SourceMappingAuditResult,
     anchored_record_scope,
     audit_canonical_mapping,
+    filter_instruction_like_evidence,
     load_raw_extraction,
     record_collection_scopes,
     section_state,
@@ -243,14 +245,23 @@ def audit_source_mapping(raw_extraction_path: Path, resume: Resume) -> SourceMap
     """Prove every populated development canonical fact is grounded in the raw resume."""
 
     raw = load_raw_extraction(raw_extraction_path, SourceMappingAuditError)
+    evidence_text = filter_instruction_like_evidence(
+        raw.full_text,
+        is_instruction_like,
+        is_strong_instruction_like,
+    )
+    evidence_raw = RawExtraction(
+        full_text=evidence_text,
+        source_sha256=raw.source_sha256,
+    )
     canonical: dict[str, Any] = resume.model_dump(mode="json")
-    claims, record_violations = _claims(resume, raw.full_text)
+    claims, record_violations = _claims(resume, evidence_text)
     return audit_canonical_mapping(
-        raw,
+        evidence_raw,
         canonical,
         claims,
         error_type=SourceMappingAuditError,
-        violations=(*record_violations, *_section_violations(resume, raw.full_text)),
+        violations=(*record_violations, *_section_violations(resume, evidence_text)),
         warning_codes=_warnings(resume, raw.full_text),
     )
 

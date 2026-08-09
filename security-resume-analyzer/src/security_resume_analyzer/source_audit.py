@@ -9,15 +9,17 @@ from typing import Any
 from .authorization import has_global_authorization_denial, source_is_authorized
 from .errors import SourceMappingAuditError
 from .models import Experience, Resume, SecurityCategory, SecurityEnvironment
-from .security import SECURITY_WARNING, is_instruction_like
+from .security import SECURITY_WARNING, is_instruction_like, is_strong_instruction_like
 from .source_audit_core import (
     MAX_RAW_EXTRACTION_BYTES,
     SOURCE_MAPPING_AUDIT_VERSION,
     AuditViolation,
     FactClaim,
+    RawExtraction,
     SourceMappingAuditResult,
     audit_canonical_mapping,
     fact_is_grounded,
+    filter_instruction_like_evidence,
     load_raw_extraction,
     record_collection_scopes,
     section_state,
@@ -363,14 +365,23 @@ def audit_source_mapping(raw_extraction_path: Path, resume: Resume) -> SourceMap
     """Prove every populated security canonical fact is grounded in the raw resume."""
 
     raw = load_raw_extraction(raw_extraction_path, SourceMappingAuditError)
+    evidence_text = filter_instruction_like_evidence(
+        raw.full_text,
+        is_instruction_like,
+        is_strong_instruction_like,
+    )
+    evidence_raw = RawExtraction(
+        full_text=evidence_text,
+        source_sha256=raw.source_sha256,
+    )
     canonical: dict[str, Any] = resume.model_dump(mode="json")
-    claims, classification_violations = _claims_and_violations(resume, raw.full_text)
+    claims, classification_violations = _claims_and_violations(resume, evidence_text)
     return audit_canonical_mapping(
-        raw,
+        evidence_raw,
         canonical,
         claims,
         error_type=SourceMappingAuditError,
-        violations=(*classification_violations, *_section_violations(resume, raw.full_text)),
+        violations=(*classification_violations, *_section_violations(resume, evidence_text)),
         warning_codes=_warnings(resume, raw.full_text),
     )
 
