@@ -1,7 +1,7 @@
 # cn-campus-sre scoring rubric
 
 Configuration version: `cn-campus-sre-1.1.0`
-Analyzer version: `3.0.0-rc.2`
+Analyzer version: `3.0.0-rc.3`
 Status: `experimental`
 
 ## Technical dimensions
@@ -94,8 +94,9 @@ The public score artifact includes:
 - `scoring_config_version: "cn-campus-sre-1.1.0"`;
 - internal `resume_id` and visible `output_name`;
 - input SHA-256 and UTC generation time;
-- for raw-document runs, a passed `source_mapping_audit` with its audit version,
-  raw source SHA-256, and privacy-safe warning codes;
+- for raw-document runs, passed `source_mapping_audits[]` entries with audit
+  version, raw and canonical-fact SHA-256, checked count, and privacy-safe
+  warning codes;
 - six `dimension_scores` with evidence, depth score, evidence-group scores,
   applied coverage, missing groups, and coverage cap;
 - weight-zero `resume_quality` with breakdown and findings;

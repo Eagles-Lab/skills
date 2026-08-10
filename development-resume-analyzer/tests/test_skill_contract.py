@@ -21,6 +21,7 @@ def test_core_skill_is_compact_and_all_direct_references_exist() -> None:
         "references/local-guidance-layer.md",
         "references/privacy-security.md",
         "references/scoring-rubric.md",
+        "references/source-audit.md",
     }
     assert all((SKILL_ROOT / target).is_file() for target in targets)
 
@@ -30,15 +31,15 @@ def test_codex_and_claude_adapters_share_the_neutral_handoff_contract() -> None:
     claude = (SKILL_ROOT / "references/claude.md").read_text(encoding="utf-8")
 
     for adapter in (codex, claude):
-        assert "raw_extraction.json" in adapter
-        assert "canonical development schema v1" in adapter
-        assert "--raw-extraction" in adapter
+        assert "extraction" in adapter
+        assert "canonical development v1" in adapter
+        assert "source audit" in adapter
         assert "ten" in adapter.lower()
         assert "untrusted" in adapter
 
-    assert "capability actually installed" in claude
-    assert "Do not hard-code a nonexistent pseudo-tool call" in claude
-    assert "semantically equivalent canonical JSON" in claude
+    assert "capabilities installed" in claude
+    assert "never hard-code a pseudo-tool" in claude
+    assert "one deidentified raw artifact" in " ".join(claude.split())
 
 
 def test_openai_agent_metadata_selects_the_development_skill() -> None:

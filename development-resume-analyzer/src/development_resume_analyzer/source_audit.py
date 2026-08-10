@@ -1,225 +1,274 @@
-"""Deterministic grounding checks between untrusted raw text and canonical facts."""
+"""Development canonical-fact adapter for the shared source-mapping audit core."""
 
 from __future__ import annotations
 
-import json
 import re
-import unicodedata
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from .errors import SourceMappingAuditError
-from .matching import normalize_text, term_pattern
-from .models import Resume
+from .models import ProjectCategory, Resume
+from .security import SECURITY_WARNING, is_instruction_like, is_strong_instruction_like
+from .source_audit_core import (
+    MAX_RAW_EXTRACTION_BYTES,
+    SOURCE_MAPPING_AUDIT_VERSION,
+    AuditViolation,
+    FactClaim,
+    RawExtraction,
+    SourceMappingAuditResult,
+    anchored_record_scope,
+    audit_canonical_mapping,
+    filter_instruction_like_evidence,
+    load_raw_extraction,
+    record_collection_scopes,
+    section_state,
+)
 
-SOURCE_MAPPING_AUDIT_VERSION = "1.1.0"
-MAX_RAW_EXTRACTION_BYTES = 25 * 1024 * 1024
-
-_SHA256 = re.compile(r"^[a-fA-F0-9]{64}$")
 _PROJECT_SECTION = re.compile(
-    r"项目(?:经历|经验|实践|竞赛|比赛|介绍|内容|描述)|课程设计|课设|开源经历|"
-    r"(?m:^[^\S\n]*(?:项目|研究经历)[^\S\n]*$)|\bprojects?(?:\s+experience)?\b",
+    r"项目[^\S\n]*(?:经历|经验|实践|竞赛|比赛|介绍|内容|描述)|"
+    r"课程[^\S\n]*设计|课设|开源[^\S\n]*经历|"
+    r"(?m:^[^\S\n]*(?:项目|研究[^\S\n]*经历|个人[^\S\n]*项目|开源[^\S\n]*项目|"
+    r"课程[^\S\n]*项目|毕业[^\S\n]*设计)"
+    r"[^\S\n]*(?:[:\uff1a])?[^\S\n]*$)|\bprojects?(?:\s+experience)?\b",
     re.I,
 )
 _INTERNSHIP_SECTION = re.compile(
-    r"实习经历|工作经历|工作经验|\binternship experience\b|\bwork experience\b", re.I
-)
-_SECTION_HEADING = re.compile(
-    r"个人(?:信息|简介|概况|总结|评价)|基本信息|求职意向|教育(?:经历|背景)|"
-    r"专业技能|个人技能|技能(?:清单|总结)?|证书|获奖(?:经历|情况)?|荣誉|"
-    r"校园(?:经历|实践)|社会实践|自我评价|兴趣爱好|开源经历|"
-    r"项目(?:经历|经验|实践|竞赛|比赛|介绍|内容|描述)|课程设计|课设|"
-    r"(?m:^[^\S\n]*(?:项目|研究经历)[^\S\n]*$)|实习经历|工作经历|工作经验|"
-    r"\b(?:profile|summary|objective|education|skills?|certifications?|awards?|"
-    r"projects?|internship experience|work experience|open source)\b",
+    r"实习[^\S\n]*经历|工作[^\S\n]*(?:经历|经验)|"
+    r"(?m:^[^\S\n]*实习[^\S\n]*(?:[:\uff1a])?[^\S\n]*$)|"
+    r"\binternship experience\b|\bwork experience\b",
     re.I,
 )
-_EMPTY_SECTION = re.compile(
-    r"^(?:无|暂无|没有|未有|待补充|未填写|none|n/?a|not\s+provided)?$", re.I
+_SKILLS_SECTION = re.compile(
+    r"专业[^\S\n]*技能|个人[^\S\n]*技能|技能(?:[^\S\n]*(?:清单|总结))?|"
+    r"技术[^\S\n]*栈|\b(?:skills?|technologies)\b",
+    re.I,
+)
+_EDUCATION_SECTION = re.compile(
+    r"教育[^\S\n]*(?:经历|背景)|(?m:^[^\S\n]*教育[^\S\n]*(?:[:\uff1a])?[^\S\n]*$)|"
+    r"\beducation\b",
+    re.I,
+)
+_ALL_HEADINGS = re.compile(
+    r"个人[^\S\n]*(?:信息|简介|概况|总结|评价)|基本[^\S\n]*信息|求职[^\S\n]*意向|"
+    r"教育[^\S\n]*(?:经历|背景)|专业[^\S\n]*技能|个人[^\S\n]*技能|"
+    r"技能(?:[^\S\n]*(?:清单|总结))?|技术[^\S\n]*栈|证书|获奖(?:经历|情况)?|荣誉|"
+    r"校园(?:经历|实践)|社会实践|自我评价|兴趣爱好|开源经历|"
+    r"项目[^\S\n]*(?:经历|经验|实践|竞赛|比赛|介绍|内容|描述)|"
+    r"课程[^\S\n]*设计|课设|(?m:^[^\S\n]*(?:项目|研究[^\S\n]*经历|"
+    r"个人[^\S\n]*项目|开源[^\S\n]*项目|课程[^\S\n]*项目|毕业[^\S\n]*设计|实习|教育)"
+    r"[^\S\n]*(?:[:\uff1a])?[^\S\n]*$)|实习[^\S\n]*经历|工作[^\S\n]*(?:经历|经验)|"
+    r"\b(?:profile|summary|objective|education|skills?|technologies|certifications?|"
+    r"awards?|projects?|internship experience|work experience|open source)\b",
+    re.I,
 )
 _INSTITUTION = re.compile(r"[\u4e00-\u9fff]{2,24}(?:大学|学院|学校)")
 _DEGREE_POLLUTION = re.compile(r"本科|专科|学士|硕士|研究生|博士")
 _EMAIL = re.compile(r"(?<![\w.+-])[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}(?![\w.-])")
 _PHONE = re.compile(r"(?<!\d)1[3-9]\d{9}(?!\d)")
-_ALIAS_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("kubernetes", ("kubernetes", "k8s")),
-    ("golang", ("golang", "go")),
-    ("javascript", ("javascript", "js")),
-    ("typescript", ("typescript", "ts")),
-    ("postgresql", ("postgresql", "postgres")),
-)
-_SKILL_ALIASES: Mapping[str, tuple[str, ...]] = {
-    alias: aliases for _, aliases in _ALIAS_GROUPS for alias in aliases
+_CATEGORY_SIGNALS: dict[ProjectCategory, tuple[str, ...]] = {
+    ProjectCategory.course_project: ("课程项目", "课程设计", "课设", "course project"),
+    ProjectCategory.personal_project: ("个人项目", "独立项目", "personal project"),
+    ProjectCategory.open_source: ("开源", "open source"),
+    ProjectCategory.competition: ("竞赛", "比赛", "competition"),
+    ProjectCategory.research: ("研究", "科研", "research"),
+    ProjectCategory.hackathon: ("黑客松", "hackathon"),
+    ProjectCategory.internship_project: ("实习项目", "internship project"),
 }
 
 
-@dataclass(frozen=True)
-class SourceMappingAuditResult:
-    raw_source_sha256: str
-    warning_codes: tuple[str, ...]
-
-    def public_metadata(self) -> dict[str, Any]:
-        return {
-            "audit_version": SOURCE_MAPPING_AUDIT_VERSION,
-            "passed": True,
-            "raw_source_sha256": self.raw_source_sha256,
-            "warning_codes": list(self.warning_codes),
-        }
+def _claim(
+    claims: list[FactClaim],
+    pointer: str,
+    value: str | int | None,
+    *,
+    raw_scope_text: str | None = None,
+) -> None:
+    if value is not None and value != "":
+        claims.append(FactClaim(pointer, value, raw_scope_text=raw_scope_text))
 
 
-def _load_raw_extraction(path: Path) -> Mapping[str, Any]:
-    source = Path(path)
-    if not source.exists() or not source.is_file() or source.is_symlink():
-        raise SourceMappingAuditError("raw extraction must be a regular JSON file")
-    if source.stat().st_size > MAX_RAW_EXTRACTION_BYTES:
-        raise SourceMappingAuditError("raw extraction exceeds the 25 MiB limit")
-    try:
-        value = json.loads(source.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise SourceMappingAuditError(
-            f"raw extraction could not be read: {type(exc).__name__}"
-        ) from exc
-    if not isinstance(value, Mapping):
-        raise SourceMappingAuditError("raw extraction root must be an object")
-    if value.get("content_trust") != "untrusted":
-        raise SourceMappingAuditError("raw extraction content_trust must be untrusted")
-    full_text = value.get("full_text")
-    if not isinstance(full_text, str) or not full_text.strip():
-        raise SourceMappingAuditError("raw extraction full_text must be non-empty")
-    digest = value.get("source_sha256")
-    if not isinstance(digest, str) or not _SHA256.fullmatch(digest):
-        raise SourceMappingAuditError("raw extraction source_sha256 must be a SHA-256 digest")
-    return value
+def _record_scope_values(record: object) -> tuple[str, ...]:
+    values: list[str] = []
+    for field in ("organization", "name", "role", "duration", "description"):
+        value = getattr(record, field, None)
+        if value:
+            values.append(value)
+    values.extend(getattr(record, "tech_stack", ()))
+    values.extend(getattr(record, "achievements", ()))
+    return tuple(values)
 
 
-def _compact(value: str) -> str:
-    normalized = unicodedata.normalize("NFKC", value).casefold()
-    return "".join(character for character in normalized if character.isalnum())
-
-
-def _claim_compact(value: str) -> str:
-    normalized = normalize_text(value)
-    for canonical, aliases in _ALIAS_GROUPS:
-        for alias in sorted(aliases, key=lambda item: (-len(item), item)):
-            normalized = term_pattern(alias).sub(canonical, normalized)
-    return _compact(normalized)
-
-
-def _grounded(value: str, raw_text: str, *, aliases: bool = False) -> bool:
-    normalized = unicodedata.normalize("NFKC", value).strip()
-    if not normalized:
-        return False
-    candidates: Sequence[str] = (normalized,)
-    if aliases:
-        candidates = _SKILL_ALIASES.get(normalized.casefold(), candidates)
-    normalized_raw = normalize_text(raw_text)
-    for candidate in candidates:
-        if all(ord(character) < 128 for character in candidate):
-            if term_pattern(candidate).search(normalized_raw):
-                return True
-        elif _compact(candidate) in _compact(raw_text):
-            return True
-    return False
-
-
-def _grounded_claim(value: str, raw_text: str) -> bool:
-    compact = _claim_compact(value)
-    return bool(compact) and compact in _claim_compact(raw_text)
-
-
-def _section_state(raw_text: str, pattern: re.Pattern[str]) -> str:
-    normalized = unicodedata.normalize("NFKC", raw_text)
-    matches = tuple(pattern.finditer(normalized))
-    if not matches:
-        return "absent"
-    for match in matches:
-        next_heading = _SECTION_HEADING.search(normalized, match.end())
-        end = next_heading.start() if next_heading else len(normalized)
-        content = normalized[match.end() : end]
-        compact = re.sub(r"[\s\W_]+", "", content, flags=re.UNICODE)
-        if not _EMPTY_SECTION.fullmatch(compact):
-            return "populated"
-    return "empty"
-
-
-def _audit_basic_info(resume: Resume, raw_text: str, errors: set[str], warnings: set[str]) -> None:
-    basic = resume.basic_info
-    for field in ("name", "major", "degree"):
-        value = getattr(basic, field)
-        if value and not _grounded(value, raw_text):
-            errors.add(f"canonical_{field}_not_grounded")
-    if basic.graduation_year is not None:
-        cohort = f"{basic.graduation_year % 100:02d}"
-        if str(basic.graduation_year) not in raw_text and not re.search(
-            rf"(?<!\d){re.escape(cohort)}\s*届(?!\d)", raw_text
-        ):
-            errors.add("canonical_graduation_year_not_grounded")
-    if basic.school:
-        if _DEGREE_POLLUTION.search(basic.school):
-            errors.add("canonical_school_contains_degree_text")
-        if not _grounded(basic.school, raw_text):
-            errors.add("canonical_school_not_grounded")
-    elif _INSTITUTION.search(raw_text):
-        warnings.add("raw_has_institution_but_canonical_school_missing")
-    contact = basic.contact
-    if contact is not None:
-        for field in ("email", "phone"):
-            value = getattr(contact, field)
-            if value and not _grounded_claim(value, raw_text):
-                errors.add(f"canonical_contact_{field}_not_grounded")
-    if _EMAIL.search(raw_text) and (contact is None or contact.email is None):
-        warnings.add("raw_has_email_but_canonical_email_missing")
-    if _PHONE.search(raw_text) and (contact is None or contact.phone is None):
-        warnings.add("raw_has_phone_but_canonical_phone_missing")
-
-
-def _audit_experiences(resume: Resume, raw_text: str, errors: set[str]) -> None:
-    project_state = _section_state(raw_text, _PROJECT_SECTION)
-    internship_state = _section_state(raw_text, _INTERNSHIP_SECTION)
-    if project_state == "populated" and not resume.projects:
-        errors.add("raw_has_project_section_but_canonical_projects_empty")
-    if project_state == "empty" and resume.projects:
-        errors.add("canonical_projects_present_but_source_section_empty")
-    if internship_state == "populated" and not resume.internships:
-        errors.add("raw_has_internship_section_but_canonical_internships_empty")
-    if internship_state == "empty" and resume.internships:
-        errors.add("canonical_internships_present_but_source_section_empty")
-    for record in (*resume.projects, *resume.internships):
-        if record.name and not _grounded(record.name, raw_text):
-            errors.add("canonical_experience_name_not_grounded")
-        if record.organization and not _grounded(record.organization, raw_text):
-            errors.add("canonical_experience_organization_not_grounded")
-        for field in ("role", "duration", "description"):
-            value = getattr(record, field)
-            if value and not _grounded_claim(value, raw_text):
-                errors.add(f"canonical_experience_{field}_not_grounded")
-        if any(not _grounded_claim(value, raw_text) for value in record.achievements):
-            errors.add("canonical_experience_achievement_not_grounded")
-
-
-def _audit_skills(resume: Resume, raw_text: str, errors: set[str]) -> None:
-    values = [item for group in resume.skills.model_dump(mode="python").values() for item in group]
-    values.extend(
-        item for record in (*resume.internships, *resume.projects) for item in record.tech_stack
+def _record_anchors(record: object) -> tuple[str, ...]:
+    identity = tuple(
+        value for field in ("organization", "name") if (value := getattr(record, field, None))
     )
-    if any(not _grounded(value, raw_text, aliases=True) for value in values):
-        errors.add("canonical_technology_not_grounded")
+    if not identity:
+        return ()
+    duration = getattr(record, "duration", None)
+    return (*identity, duration) if duration else identity
+
+
+def _claims(resume: Resume, raw_text: str) -> tuple[list[FactClaim], list[AuditViolation]]:
+    claims: list[FactClaim] = []
+    violations: list[AuditViolation] = []
+    basic = resume.basic_info
+    for field in ("name", "school", "major", "degree"):
+        _claim(claims, f"/basic_info/{field}", getattr(basic, field))
+    if basic.graduation_year is not None:
+        claims.append(
+            FactClaim(
+                "/basic_info/graduation_year",
+                basic.graduation_year,
+                match_kind="graduation_year",
+            )
+        )
+    if basic.contact is not None:
+        for field in ("phone", "email"):
+            _claim(claims, f"/basic_info/contact/{field}", getattr(basic.contact, field))
+    for collection_name, records in (
+        ("internships", resume.internships),
+        ("projects", resume.projects),
+    ):
+        heading_pattern = (
+            _INTERNSHIP_SECTION if collection_name == "internships" else _PROJECT_SECTION
+        )
+        record_scope_result = record_collection_scopes(
+            raw_text,
+            tuple(_record_anchors(record) for record in records),
+            collection_pointer=f"/{collection_name}",
+            heading_pattern=heading_pattern,
+            all_headings_pattern=_ALL_HEADINGS,
+        )
+        violations.extend(record_scope_result.violations)
+        for index, (record, raw_scope) in enumerate(
+            zip(records, record_scope_result.scopes, strict=True)
+        ):
+            prefix = f"/{collection_name}/{index}"
+            for field in ("organization", "name", "role", "duration", "description"):
+                _claim(
+                    claims,
+                    f"{prefix}/{field}",
+                    getattr(record, field),
+                    raw_scope_text=raw_scope,
+                )
+            for field in ("tech_stack", "achievements"):
+                for item_index, value in enumerate(getattr(record, field)):
+                    _claim(
+                        claims,
+                        f"{prefix}/{field}/{item_index}",
+                        value,
+                        raw_scope_text=raw_scope,
+                    )
+            category = getattr(record, "category", None)
+            if category is not None and category is not ProjectCategory.other:
+                scope_values = _record_scope_values(record)
+                classification_scope = anchored_record_scope(raw_text, _record_anchors(record))
+                claims.append(
+                    FactClaim(
+                        f"{prefix}/category",
+                        category.value,
+                        match_kind="controlled",
+                        candidates=_CATEGORY_SIGNALS[category],
+                        scope_text="\n".join(scope_values),
+                        scope_values=scope_values,
+                        raw_scope_text=classification_scope,
+                    )
+                )
+    for group, values in resume.skills.model_dump(mode="python").items():
+        for index, value in enumerate(values):
+            _claim(claims, f"/skills/{group}/{index}", value)
+    return claims, violations
+
+
+def _section_violations(resume: Resume, raw_text: str) -> list[AuditViolation]:
+    violations: list[AuditViolation] = []
+    states = {
+        "projects": section_state(raw_text, _PROJECT_SECTION, _ALL_HEADINGS),
+        "internships": section_state(raw_text, _INTERNSHIP_SECTION, _ALL_HEADINGS),
+        "skills": section_state(raw_text, _SKILLS_SECTION, _ALL_HEADINGS),
+        "education": section_state(raw_text, _EDUCATION_SECTION, _ALL_HEADINGS),
+    }
+    if states["projects"] == "populated" and not resume.projects:
+        violations.append(
+            AuditViolation("raw_has_project_section_but_canonical_projects_empty", "/projects")
+        )
+    if states["projects"] == "empty" and resume.projects:
+        violations.append(
+            AuditViolation("canonical_projects_present_but_source_section_empty", "/projects")
+        )
+    if states["internships"] == "populated" and not resume.internships:
+        violations.append(
+            AuditViolation(
+                "raw_has_internship_section_but_canonical_internships_empty", "/internships"
+            )
+        )
+    if states["internships"] == "empty" and resume.internships:
+        violations.append(
+            AuditViolation("canonical_internships_present_but_source_section_empty", "/internships")
+        )
+    if states["skills"] == "populated" and not any(
+        resume.skills.model_dump(mode="python").values()
+    ):
+        violations.append(AuditViolation("raw_has_skills_but_canonical_skills_empty", "/skills"))
+    education_values = (
+        resume.basic_info.school,
+        resume.basic_info.major,
+        resume.basic_info.degree,
+        resume.basic_info.graduation_year,
+    )
+    if states["education"] == "populated" and not any(education_values):
+        violations.append(
+            AuditViolation("raw_has_education_but_canonical_education_empty", "/basic_info")
+        )
+    if resume.basic_info.school and _DEGREE_POLLUTION.search(resume.basic_info.school):
+        violations.append(
+            AuditViolation("canonical_school_contains_degree_text", "/basic_info/school")
+        )
+    return violations
+
+
+def _warnings(resume: Resume, raw_text: str) -> list[str]:
+    warnings: list[str] = []
+    if is_instruction_like(raw_text):
+        warnings.append(SECURITY_WARNING)
+    if not resume.basic_info.school and _INSTITUTION.search(raw_text):
+        warnings.append("raw_has_institution_but_canonical_school_missing")
+    contact = resume.basic_info.contact
+    if _EMAIL.search(raw_text) and (contact is None or contact.email is None):
+        warnings.append("raw_has_email_but_canonical_email_missing")
+    if _PHONE.search(raw_text) and (contact is None or contact.phone is None):
+        warnings.append("raw_has_phone_but_canonical_phone_missing")
+    return warnings
 
 
 def audit_source_mapping(raw_extraction_path: Path, resume: Resume) -> SourceMappingAuditResult:
-    raw = _load_raw_extraction(raw_extraction_path)
-    raw_text = str(raw["full_text"])
-    errors: set[str] = set()
-    warnings: set[str] = set()
-    _audit_basic_info(resume, raw_text, errors, warnings)
-    _audit_experiences(resume, raw_text, errors)
-    _audit_skills(resume, raw_text, errors)
-    if errors:
-        raise SourceMappingAuditError(
-            "source/canonical mapping audit failed: " + ", ".join(sorted(errors))
-        )
-    return SourceMappingAuditResult(
-        raw_source_sha256=str(raw["source_sha256"]).lower(),
-        warning_codes=tuple(sorted(warnings)),
+    """Prove every populated development canonical fact is grounded in the raw resume."""
+
+    raw = load_raw_extraction(raw_extraction_path, SourceMappingAuditError)
+    evidence_text = filter_instruction_like_evidence(
+        raw.full_text,
+        is_instruction_like,
+        is_strong_instruction_like,
     )
+    evidence_raw = RawExtraction(
+        full_text=evidence_text,
+        source_sha256=raw.source_sha256,
+    )
+    canonical: dict[str, Any] = resume.model_dump(mode="json")
+    claims, record_violations = _claims(resume, evidence_text)
+    return audit_canonical_mapping(
+        evidence_raw,
+        canonical,
+        claims,
+        error_type=SourceMappingAuditError,
+        violations=(*record_violations, *_section_violations(resume, evidence_text)),
+        warning_codes=_warnings(resume, raw.full_text),
+    )
+
+
+__all__ = [
+    "MAX_RAW_EXTRACTION_BYTES",
+    "SOURCE_MAPPING_AUDIT_VERSION",
+    "SourceMappingAuditResult",
+    "audit_source_mapping",
+]

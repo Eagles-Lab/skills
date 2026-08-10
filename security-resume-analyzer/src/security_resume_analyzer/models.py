@@ -9,8 +9,8 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstr
 
 SCHEMA_VERSION: Literal["1.0"] = "1.0"
 SCORING_PROFILE: Literal["cn-campus-security-general"] = "cn-campus-security-general"
-SCORING_CONFIG_VERSION: Literal["cn-campus-security-general-1.0.0"] = (
-    "cn-campus-security-general-1.0.0"
+SCORING_CONFIG_VERSION: Literal["cn-campus-security-general-1.0.1"] = (
+    "cn-campus-security-general-1.0.1"
 )
 
 
@@ -219,7 +219,7 @@ class GradeInfo(StrictModel):
 class ScoreResult(StrictModel):
     schema_version: Literal["1.0"] = SCHEMA_VERSION
     scoring_profile: Literal["cn-campus-security-general"] = SCORING_PROFILE
-    scoring_config_version: Literal["cn-campus-security-general-1.0.0"] = SCORING_CONFIG_VERSION
+    scoring_config_version: Literal["cn-campus-security-general-1.0.1"] = SCORING_CONFIG_VERSION
     dimension_weights: dict[DimensionName, float]
     total_score: float = Field(ge=1.0, le=10.0)
     dimension_scores: dict[DimensionName, DimensionScore]

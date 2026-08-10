@@ -4,14 +4,24 @@ on:
   pull_request:
     paths:
       - ".github/workflows/security-resume-analyzer.yml"
+      - ".github/workflows/resume-analyzer-contracts.yml"
+      - ".gitignore"
+      - "AGENTS.md"
       - "README.md"
       - "CLAUDE.md"
+      - "contracts/**"
+      - "tools/**"
       - "security-resume-analyzer/**"
   push:
     paths:
       - ".github/workflows/security-resume-analyzer.yml"
+      - ".github/workflows/resume-analyzer-contracts.yml"
+      - ".gitignore"
+      - "AGENTS.md"
       - "README.md"
       - "CLAUDE.md"
+      - "contracts/**"
+      - "tools/**"
       - "security-resume-analyzer/**"
   workflow_dispatch:
 
