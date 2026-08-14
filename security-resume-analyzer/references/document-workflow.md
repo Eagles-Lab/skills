@@ -28,6 +28,12 @@ tool-neutral raw object. Include `content_trust: untrusted`, the original
 document SHA-256, and complete `full_text` in reading order. Do not reuse a
 historical extraction without verifying the original source hash.
 
+For Markdown specifically, preserve original line breaks, heading markers, and
+standalone strong-emphasis markers in audit `full_text`. Use those markers to
+resolve sections, same-level records, and nested detail headings. A separate
+plain-text view may be derived later for presentation, but must not replace the
+structure-preserving audit input or drive canonical record splitting.
+
 Map only explicit facts. Use `null`, `[]`, and `environment: unknown` when a
 value or authorization context cannot be recovered reliably. Preserve wording
 for score-bearing facts and pass the raw extraction separately to the analyzer;

@@ -69,6 +69,11 @@ It emits untrusted text and tables; it never infers schools, experiences,
 project categories, technologies, or skills. Stop when reliable extraction is
 not possible.
 
+For Markdown, preserve line breaks plus heading and standalone strong-emphasis
+markers in `raw_extraction.json`. Detect sections and peer records before
+deriving any presentation-only plain text; never map canonical records from a
+structure-stripped copy.
+
 ## Map to canonical facts
 
 Map only explicit facts into `basic_info`, `internships[]`, `projects[]`, and
@@ -105,6 +110,13 @@ sections. This broad reverse check is intentionally not an exhaustive
 source-line completeness proof. Check experience facts only inside one unique
 multi-line raw record: organization or name is required and duration is only a
 tie-breaker.
+
+Treat same-level Markdown headings and standalone strong-emphasis record
+headings as explicit peers. Reject every unclaimed peer with
+`raw_record_not_mapped`; nested detail headings remain inside their parent
+record. When a structured raw record has a substantive body, require at least
+one non-identity canonical detail grounded in that body or fail with
+`canonical_record_details_missing`.
 
 Reject repeated strong identities across collections with
 `canonical_duplicate_record`: internships require organization plus duration;

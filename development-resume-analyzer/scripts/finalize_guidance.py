@@ -42,9 +42,11 @@ EMAIL_RE = re.compile(r"(?i)(?<![\w.+-])[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 PHONE_RE = re.compile(r"(?<!\d)(?:\+?86[- ]?)?1[3-9]\d{9}(?!\d)")
 INSTRUCTION_RE = re.compile(
     r"(?i)(?:ignore\s+(?:all\s+)?previous|system\s+prompt|developer\s+message|"
-    r"reveal\s+(?:the\s+)?prompt|execute\s+(?:this\s+)?command|tool\s+call|"
+    r"reveal\s+(?:the\s+)?prompt|execute\s+(?:this\s+)?command|"
+    r"(?:please\s+)?(?:perform|make|issue|invoke|execute|run)\s+(?:a\s+|the\s+)?tool\s+call|"
     r"忽略(?:以上|之前|前面).{0,12}(?:指令|要求)|系统提示(?:词|内容)?|"
-    r"开发者消息|执行(?:以下|这个|上述).{0,8}(?:命令|代码)|调用.{0,8}工具|"
+    r"开发者消息|执行(?:以下|这个|上述).{0,8}(?:命令|代码)|"
+    r"(?:请|必须|立即|现在)\s*调用.{0,8}工具|"
     r"泄露.{0,8}(?:提示词|密钥|环境变量))"
 )
 SCORE_RESTATEMENT_RE = re.compile(

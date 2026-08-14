@@ -24,8 +24,10 @@ from .source_audit_core import (
 )
 
 _PROJECT_SECTION = re.compile(
-    r"项目[^\S\n]*(?:经历|经验|实践|竞赛|比赛|介绍|内容|描述)|"
-    r"课程[^\S\n]*设计|课设|开源[^\S\n]*经历|"
+    r"(?<!\w)项目[^\S\n]*(?:经历|经验|实践|竞赛|比赛)(?=[^\S\n]+)|"
+    r"(?m:^[^\S\n]*(?:项目[^\S\n]*(?:经历|经验|实践|竞赛|比赛)|"
+    r"课程[^\S\n]*设计|课设|开源[^\S\n]*经历)"
+    r"[^\S\n]*(?:[:\uff1a])?[^\S\n]*$)|"
     r"(?m:^[^\S\n]*(?:项目|研究[^\S\n]*经历|个人[^\S\n]*项目|开源[^\S\n]*项目|"
     r"课程[^\S\n]*项目|毕业[^\S\n]*设计)"
     r"[^\S\n]*(?:[:\uff1a])?[^\S\n]*$)|\bprojects?(?:\s+experience)?\b",
@@ -52,8 +54,10 @@ _ALL_HEADINGS = re.compile(
     r"教育[^\S\n]*(?:经历|背景)|专业[^\S\n]*技能|个人[^\S\n]*技能|"
     r"技能(?:[^\S\n]*(?:清单|总结))?|技术[^\S\n]*栈|证书|获奖(?:经历|情况)?|荣誉|"
     r"校园(?:经历|实践)|社会实践|自我评价|兴趣爱好|开源经历|"
-    r"项目[^\S\n]*(?:经历|经验|实践|竞赛|比赛|介绍|内容|描述)|"
-    r"课程[^\S\n]*设计|课设|(?m:^[^\S\n]*(?:项目|研究[^\S\n]*经历|"
+    r"(?<!\w)项目[^\S\n]*(?:经历|经验|实践|竞赛|比赛)(?=[^\S\n]+)|"
+    r"(?m:^[^\S\n]*(?:项目[^\S\n]*(?:经历|经验|实践|竞赛|比赛)|"
+    r"课程[^\S\n]*设计|课设)[^\S\n]*(?:[:\uff1a])?[^\S\n]*$)|"
+    r"(?m:^[^\S\n]*(?:项目|研究[^\S\n]*经历|"
     r"个人[^\S\n]*项目|开源[^\S\n]*项目|课程[^\S\n]*项目|毕业[^\S\n]*设计|实习|教育)"
     r"[^\S\n]*(?:[:\uff1a])?[^\S\n]*$)|实习[^\S\n]*经历|工作[^\S\n]*(?:经历|经验)|"
     r"\b(?:profile|summary|objective|education|skills?|technologies|certifications?|"
@@ -75,6 +79,17 @@ def _claim(
 ) -> None:
     if value is not None and value != "":
         claims.append(FactClaim(pointer, value, raw_scope_text=raw_scope_text))
+
+
+def _record_detail_values(record: object) -> tuple[str, ...]:
+    values = [
+        value
+        for field in ("role", "duration", "description")
+        if (value := getattr(record, field, None))
+    ]
+    values.extend(getattr(record, "tech_stack", ()))
+    values.extend(getattr(record, "achievements", ()))
+    return tuple(values)
 
 
 def _claims(resume: Resume, raw_text: str) -> tuple[list[FactClaim], list[AuditViolation]]:
@@ -105,6 +120,7 @@ def _claims(resume: Resume, raw_text: str) -> tuple[list[FactClaim], list[AuditV
         collection_pointer="/internships",
         heading_pattern=_INTERNSHIP_SECTION,
         all_headings_pattern=_ALL_HEADINGS,
+        mapped_detail_groups=tuple(_record_detail_values(record) for record in resume.internships),
     )
     violations.extend(internship_scopes.violations)
     for index, (internship, raw_scope) in enumerate(
@@ -135,6 +151,7 @@ def _claims(resume: Resume, raw_text: str) -> tuple[list[FactClaim], list[AuditV
         collection_pointer="/projects",
         heading_pattern=_PROJECT_SECTION,
         all_headings_pattern=_ALL_HEADINGS,
+        mapped_detail_groups=tuple(_record_detail_values(record) for record in resume.projects),
     )
     violations.extend(project_scopes.violations)
     for index, (project, raw_scope) in enumerate(

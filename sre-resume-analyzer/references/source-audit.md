@@ -71,6 +71,15 @@ ambiguous anchors fail with `canonical_record_anchor_missing`,
 `canonical_record_scope_not_found`, or `canonical_record_scope_ambiguous`. An
 explicit raw peer header left unclaimed fails with `raw_record_not_mapped`.
 
+For structure-preserving Markdown, same-level headings under the target section
+and standalone strong-emphasis headings are explicit peers. Deeper headings
+such as project background, responsibilities, technology, and results stay in
+the parent record. Every peer must be claimed exactly once. If a structured raw
+record has substantive body content, at least one non-identity canonical detail
+must be grounded in that body; otherwise fail with
+`canonical_record_details_missing`. This is a structured-record completeness
+gate, not permission to infer or paraphrase omitted facts.
+
 Apply ASCII token boundaries: `MongoDB` does not ground `Go`, and `MySQL` does
 not ground standalone `SQL`. Do not use edit distance, token-overlap scoring,
 semantic similarity, reordered paraphrases, or numeric approximation.

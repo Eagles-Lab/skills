@@ -36,6 +36,16 @@ def raw_extraction(path: Path, text: str, *, digest: str = "a" * 64) -> Path:
     return path
 
 
+def test_project_section_ignores_narrative_experience_phrase(tmp_path: Path) -> None:
+    raw = raw_extraction(
+        tmp_path / "raw.json",
+        "个人总结\n具备完整项目经验\n专业技能\nPython",
+    )
+    resume = Resume.model_validate({"skills": {"programming_languages": ["Python"]}})
+
+    assert audit_source_mapping(raw, resume).public_metadata()["passed"] is True
+
+
 def test_rejects_a_project_duplicated_from_one_raw_occurrence(tmp_path: Path) -> None:
     raw = raw_extraction(tmp_path / "raw.json", "项目经历\n平台 2025 使用 Python")
     project = {"name": "平台", "duration": "2025", "description": "使用 Python"}
