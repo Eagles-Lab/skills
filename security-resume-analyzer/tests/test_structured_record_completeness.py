@@ -76,3 +76,55 @@ def test_raw_record_body_rejects_anchor_only_mapping(tmp_path: Path) -> None:
         match=r"canonical_record_details_missing@/projects/0",
     ):
         audit_source_mapping(raw, resume)
+
+
+def test_plain_text_record_body_rejects_anchor_only_mapping(tmp_path: Path) -> None:
+    raw = _raw(tmp_path / "raw.json", "项目经历\n监控平台 2025\n实现采集")
+    resume = Resume.model_validate({"projects": [{"name": "监控平台", "duration": "2025"}]})
+
+    with pytest.raises(
+        SourceMappingAuditError,
+        match=r"canonical_record_details_missing@/projects/0",
+    ):
+        audit_source_mapping(raw, resume)
+
+
+def test_role_and_duration_do_not_satisfy_substantive_record_body(tmp_path: Path) -> None:
+    raw = _raw(
+        tmp_path / "raw.json",
+        "## 项目经历\n### 监控平台 | 开发工程师 | 2025\n实现采集",
+    )
+    resume = Resume.model_validate(
+        {"projects": [{"name": "监控平台", "role": "开发工程师", "duration": "2025"}]}
+    )
+
+    with pytest.raises(
+        SourceMappingAuditError,
+        match=r"canonical_record_details_missing@/projects/0",
+    ):
+        audit_source_mapping(raw, resume)
+
+
+def test_plain_text_record_with_grounded_description_passes(tmp_path: Path) -> None:
+    raw = _raw(tmp_path / "raw.json", "项目经历\n监控平台 2025\n实现采集")
+    resume = Resume.model_validate(
+        {"projects": [{"name": "监控平台", "duration": "2025", "description": "实现采集"}]}
+    )
+
+    assert audit_source_mapping(raw, resume).public_metadata()["passed"] is True
+
+
+def test_multiline_description_can_ground_one_substantive_body_line(tmp_path: Path) -> None:
+    raw = _raw(tmp_path / "raw.json", "## 项目经历\n### 监控平台\n#### 项目背景\n实现采集")
+    resume = Resume.model_validate(
+        {"projects": [{"name": "监控平台", "description": "项目背景\n实现采集"}]}
+    )
+
+    assert audit_source_mapping(raw, resume).public_metadata()["passed"] is True
+
+
+def test_sparse_record_without_body_remains_valid(tmp_path: Path) -> None:
+    raw = _raw(tmp_path / "raw.json", "项目经历\n监控平台")
+    resume = Resume.model_validate({"projects": [{"name": "监控平台"}]})
+
+    assert audit_source_mapping(raw, resume).public_metadata()["passed"] is True

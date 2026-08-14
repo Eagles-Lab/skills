@@ -81,12 +81,11 @@ def _claim(
         claims.append(FactClaim(pointer, value, raw_scope_text=raw_scope_text))
 
 
-def _record_detail_values(record: object) -> tuple[str, ...]:
-    values = [
-        value
-        for field in ("role", "duration", "description")
-        if (value := getattr(record, field, None))
-    ]
+def _record_substantive_detail_values(record: object) -> tuple[str, ...]:
+    description = getattr(record, "description", None)
+    values = (
+        [line.strip() for line in description.splitlines() if line.strip()] if description else []
+    )
     values.extend(getattr(record, "tech_stack", ()))
     values.extend(getattr(record, "achievements", ()))
     return tuple(values)
@@ -120,7 +119,9 @@ def _claims(resume: Resume, raw_text: str) -> tuple[list[FactClaim], list[AuditV
         collection_pointer="/internships",
         heading_pattern=_INTERNSHIP_SECTION,
         all_headings_pattern=_ALL_HEADINGS,
-        mapped_detail_groups=tuple(_record_detail_values(record) for record in resume.internships),
+        mapped_substantive_detail_groups=tuple(
+            _record_substantive_detail_values(record) for record in resume.internships
+        ),
     )
     violations.extend(internship_scopes.violations)
     for index, (internship, raw_scope) in enumerate(
@@ -151,7 +152,9 @@ def _claims(resume: Resume, raw_text: str) -> tuple[list[FactClaim], list[AuditV
         collection_pointer="/projects",
         heading_pattern=_PROJECT_SECTION,
         all_headings_pattern=_ALL_HEADINGS,
-        mapped_detail_groups=tuple(_record_detail_values(record) for record in resume.projects),
+        mapped_substantive_detail_groups=tuple(
+            _record_substantive_detail_values(record) for record in resume.projects
+        ),
     )
     violations.extend(project_scopes.violations)
     for index, (project, raw_scope) in enumerate(

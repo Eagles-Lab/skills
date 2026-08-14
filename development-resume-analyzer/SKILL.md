@@ -114,9 +114,10 @@ tie-breaker.
 Treat same-level Markdown headings and standalone strong-emphasis record
 headings as explicit peers. Reject every unclaimed peer with
 `raw_record_not_mapped`; nested detail headings remain inside their parent
-record. When a structured raw record has a substantive body, require at least
-one non-identity canonical detail grounded in that body or fail with
-`canonical_record_details_missing`.
+record. For every resolved record scope, including plain text after structure
+loss, require at least one substantive canonical detail (`description`,
+`tech_stack`, or `achievement`) grounded in a substantive body or fail with
+`canonical_record_details_missing`. Role and duration never satisfy this gate.
 
 Reject repeated strong identities across collections with
 `canonical_duplicate_record`: internships require organization plus duration;

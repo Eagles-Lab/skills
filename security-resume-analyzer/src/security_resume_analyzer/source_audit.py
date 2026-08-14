@@ -137,12 +137,11 @@ def _record_scope_values(record: object) -> tuple[str, ...]:
     return tuple(values)
 
 
-def _record_detail_values(record: object) -> tuple[str, ...]:
-    values = [
-        value
-        for field in ("role", "duration", "description")
-        if (value := getattr(record, field, None))
-    ]
+def _record_substantive_detail_values(record: object) -> tuple[str, ...]:
+    description = getattr(record, "description", None)
+    values = (
+        [line.strip() for line in description.splitlines() if line.strip()] if description else []
+    )
     values.extend(getattr(record, "tech_stack", ()))
     values.extend(getattr(record, "achievements", ()))
     return tuple(values)
@@ -234,7 +233,9 @@ def _claims_and_violations(
             collection_pointer=f"/{collection_name}",
             heading_pattern=heading_pattern,
             all_headings_pattern=_ALL_HEADINGS,
-            mapped_detail_groups=tuple(_record_detail_values(record) for record in records),
+            mapped_substantive_detail_groups=tuple(
+                _record_substantive_detail_values(record) for record in records
+            ),
         )
         violations.extend(record_scope_result.violations)
         for index, (experience, raw_scope) in enumerate(
@@ -252,8 +253,8 @@ def _claims_and_violations(
         collection_pointer="/security_activities",
         heading_pattern=_SECURITY_SECTION,
         all_headings_pattern=_ALL_HEADINGS,
-        mapped_detail_groups=tuple(
-            _record_detail_values(record) for record in resume.security_activities
+        mapped_substantive_detail_groups=tuple(
+            _record_substantive_detail_values(record) for record in resume.security_activities
         ),
     )
     violations.extend(security_scope_result.violations)

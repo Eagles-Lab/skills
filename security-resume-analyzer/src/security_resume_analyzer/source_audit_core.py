@@ -1143,7 +1143,7 @@ def record_collection_scopes(
     collection_pointer: str,
     heading_pattern: re.Pattern[str],
     all_headings_pattern: re.Pattern[str],
-    mapped_detail_groups: Sequence[Sequence[str]] | None = None,
+    mapped_substantive_detail_groups: Sequence[Sequence[str]] | None = None,
 ) -> RecordCollectionScopeResult:
     """Resolve every canonical record to one raw multi-line scope.
 
@@ -1151,7 +1151,9 @@ def record_collection_scopes(
     low-noise raw record header and ends at the next peer header or section
     heading. All anchors for a canonical record must occur in exactly one such
     scope. When an explicit raw header is left unclaimed, omission is a hard
-    violation. Ambiguous input fails closed without exposing source text.
+    violation. A resolved scope with substantive body content must map at least
+    one substantive detail, even when source formatting was stripped. Ambiguous
+    input fails closed without exposing source text.
     """
 
     line_values = raw_text.splitlines(keepends=True)
@@ -1307,18 +1309,18 @@ def record_collection_scopes(
             )
             scope_indexes[record_index] = None
 
-    if mapped_detail_groups is not None:
-        if len(mapped_detail_groups) != len(normalized_groups):
-            raise ValueError("mapped_detail_groups must align with anchor_groups")
+    if mapped_substantive_detail_groups is not None:
+        if len(mapped_substantive_detail_groups) != len(normalized_groups):
+            raise ValueError("mapped_substantive_detail_groups must align with anchor_groups")
         for record_index, scope_index in enumerate(scope_indexes):
-            if scope_index is None or not spans[scope_index][1]:
+            if scope_index is None:
                 continue
             body = _record_scope_body(spans[scope_index][0])
             if not body:
                 continue
             details = tuple(
                 value
-                for value in mapped_detail_groups[record_index]
+                for value in mapped_substantive_detail_groups[record_index]
                 if normalize_text(value).strip()
             )
             if not any(direct_fact_is_grounded(value, body) for value in details):
