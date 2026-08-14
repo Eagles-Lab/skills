@@ -25,8 +25,10 @@ from .source_audit_core import (
 )
 
 _PROJECT_SECTION = re.compile(
-    r"项目[^\S\n]*(?:经历|经验|实践|竞赛|比赛|介绍|内容|描述)|"
-    r"课程[^\S\n]*设计|课设|开源[^\S\n]*经历|"
+    r"(?<!\w)项目[^\S\n]*(?:经历|经验|实践|竞赛|比赛)(?=[^\S\n]+)|"
+    r"(?m:^[^\S\n]*(?:项目[^\S\n]*(?:经历|经验|实践|竞赛|比赛)|"
+    r"课程[^\S\n]*设计|课设|开源[^\S\n]*经历)"
+    r"[^\S\n]*(?:[:\uff1a])?[^\S\n]*$)|"
     r"(?m:^[^\S\n]*(?:项目|研究[^\S\n]*经历|个人[^\S\n]*项目|开源[^\S\n]*项目|"
     r"课程[^\S\n]*项目|毕业[^\S\n]*设计)"
     r"[^\S\n]*(?:[:\uff1a])?[^\S\n]*$)|\bprojects?(?:\s+experience)?\b",
@@ -53,8 +55,10 @@ _ALL_HEADINGS = re.compile(
     r"教育[^\S\n]*(?:经历|背景)|专业[^\S\n]*技能|个人[^\S\n]*技能|"
     r"技能(?:[^\S\n]*(?:清单|总结))?|技术[^\S\n]*栈|证书|获奖(?:经历|情况)?|荣誉|"
     r"校园(?:经历|实践)|社会实践|自我评价|兴趣爱好|开源经历|"
-    r"项目[^\S\n]*(?:经历|经验|实践|竞赛|比赛|介绍|内容|描述)|"
-    r"课程[^\S\n]*设计|课设|(?m:^[^\S\n]*(?:项目|研究[^\S\n]*经历|"
+    r"(?<!\w)项目[^\S\n]*(?:经历|经验|实践|竞赛|比赛)(?=[^\S\n]+)|"
+    r"(?m:^[^\S\n]*(?:项目[^\S\n]*(?:经历|经验|实践|竞赛|比赛)|"
+    r"课程[^\S\n]*设计|课设)[^\S\n]*(?:[:\uff1a])?[^\S\n]*$)|"
+    r"(?m:^[^\S\n]*(?:项目|研究[^\S\n]*经历|"
     r"个人[^\S\n]*项目|开源[^\S\n]*项目|课程[^\S\n]*项目|毕业[^\S\n]*设计|实习|教育)"
     r"[^\S\n]*(?:[:\uff1a])?[^\S\n]*$)|实习[^\S\n]*经历|工作[^\S\n]*(?:经历|经验)|"
     r"\b(?:profile|summary|objective|education|skills?|technologies|certifications?|"
@@ -93,6 +97,16 @@ def _record_scope_values(record: object) -> tuple[str, ...]:
         value = getattr(record, field, None)
         if value:
             values.append(value)
+    values.extend(getattr(record, "tech_stack", ()))
+    values.extend(getattr(record, "achievements", ()))
+    return tuple(values)
+
+
+def _record_substantive_detail_values(record: object) -> tuple[str, ...]:
+    description = getattr(record, "description", None)
+    values = (
+        [line.strip() for line in description.splitlines() if line.strip()] if description else []
+    )
     values.extend(getattr(record, "tech_stack", ()))
     values.extend(getattr(record, "achievements", ()))
     return tuple(values)
@@ -138,6 +152,9 @@ def _claims(resume: Resume, raw_text: str) -> tuple[list[FactClaim], list[AuditV
             collection_pointer=f"/{collection_name}",
             heading_pattern=heading_pattern,
             all_headings_pattern=_ALL_HEADINGS,
+            mapped_substantive_detail_groups=tuple(
+                _record_substantive_detail_values(record) for record in records
+            ),
         )
         violations.extend(record_scope_result.violations)
         for index, (record, raw_scope) in enumerate(

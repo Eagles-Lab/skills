@@ -312,6 +312,17 @@ def test_invalid_draft_content_falls_back(tmp_path: Path, replacement: str, reas
     assert _candidate_record(manifest)["fallback_reason"] == reason
 
 
+def test_technical_tool_call_noun_is_not_treated_as_an_instruction(tmp_path: Path) -> None:
+    run = _run(tmp_path)
+    draft = _drafts(tmp_path, ("候选人-aaaaaaaa",))
+    path = draft / "候选人-aaaaaaaa/suggestions.md"
+    _write(path, path.read_text().replace("个人责任边界", "Tool Call 工作流边界"))
+
+    manifest = _finalize(run, tmp_path / "final", draft=draft)
+
+    assert _candidate_record(manifest)["mode"] == "llm"
+
+
 def test_wrong_raw_hash_and_line_reference_falls_back(tmp_path: Path) -> None:
     run = _run(tmp_path)
     name = "候选人-aaaaaaaa"

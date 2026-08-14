@@ -67,6 +67,11 @@ untrusted text and tables; it never infers resume fields. Stop on unreadable,
 materially truncated, encrypted, or scanned documents when an approved reader
 cannot recover them reliably.
 
+For Markdown, preserve line breaks plus heading and standalone strong-emphasis
+markers in `raw_extraction.json`. Detect sections and peer records before
+deriving any presentation-only plain text; never map canonical records from a
+structure-stripped copy.
+
 ## Map to canonical facts
 
 Map only explicit facts into `basic_info`, `internships[]`, `projects[]`, and
@@ -102,6 +107,14 @@ sections. This broad reverse check is intentionally not an exhaustive
 source-line completeness proof. Check experience facts only inside one unique
 multi-line raw record: internships require company, projects require name, and
 duration is only a tie-breaker.
+
+Treat same-level Markdown headings and standalone strong-emphasis record
+headings as explicit peers. Reject every unclaimed peer with
+`raw_record_not_mapped`; nested detail headings remain inside their parent
+record. For every resolved record scope, including plain text after structure
+loss, require at least one substantive canonical detail (`description`,
+`tech_stack`, or `achievement`) grounded in a substantive body or fail with
+`canonical_record_details_missing`. Role and duration never satisfy this gate.
 
 Reject repeated strong identities across collections with
 `canonical_duplicate_record`: internships require company plus duration,

@@ -894,6 +894,12 @@ _RECORD_HEADER_CATEGORY_PATTERN = re.compile(
     r"internship\s+project)\b",
     re.I,
 )
+_RECORD_DETAIL_HEADING_PATTERN = re.compile(
+    r"(?:项目背景|项目描述|项目成果|项目亮点|项目职责|个人职责|责任边界|核心贡献|"
+    r"核心工作|量化结果|技术栈|工作内容|主要工作|职责|描述|成果|过程|技术架构|"
+    r"关键技术|实现内容|我的工作|主要职责|具体工作|开发环境|技术方案|功能实现|项目总结)",
+    re.I,
+)
 
 
 def _heading_line_matches(line: str, pattern: re.Pattern[str]) -> bool:
@@ -903,6 +909,81 @@ def _heading_line_matches(line: str, pattern: re.Pattern[str]) -> bool:
     candidate = re.sub(r"^#{1,6}\s*", "", candidate)
     candidate = re.sub(r"\s*[:\uff1a]\s*$", "", candidate)
     return bool(candidate and pattern.fullmatch(candidate))
+
+
+def _markdown_heading_level(line: str) -> int | None:
+    match = re.match(r"^\s*(#{1,6})\s+\S", unicodedata.normalize("NFKC", line))
+    return len(match.group(1)) if match else None
+
+
+def _structural_heading_content(line: str) -> str:
+    candidate = _record_line_content(unicodedata.normalize("NFKC", line)).strip()
+    candidate = re.sub(r"^#{1,6}\s*", "", candidate).strip()
+    strong = re.fullmatch(r"(?P<marker>\*\*|__)(?P<content>.+?)(?P=marker)", candidate)
+    if strong:
+        candidate = strong.group("content").strip()
+    return re.sub(r"\s*[:\uff1a]\s*$", "", candidate).strip()
+
+
+def _is_record_detail_heading(line: str) -> bool:
+    content = _structural_heading_content(line)
+    return bool(content and _RECORD_DETAIL_HEADING_PATTERN.fullmatch(content))
+
+
+def _strong_heading_content(line: str) -> str:
+    candidate = _record_line_content(unicodedata.normalize("NFKC", line)).strip()
+    match = re.fullmatch(r"(?P<marker>\*\*|__)(?P<content>.+?)(?P=marker)", candidate)
+    return match.group("content").strip() if match else ""
+
+
+def _structural_record_starts(
+    lines: Sequence[str],
+    region_start: int,
+    region_end: int,
+    *,
+    section_heading_index: int | None,
+    all_headings_pattern: re.Pattern[str],
+) -> set[int]:
+    """Return low-noise peer starts while preserving nested detail headings."""
+
+    section_level = (
+        _markdown_heading_level(lines[section_heading_index])
+        if section_heading_index is not None
+        else None
+    )
+    markdown_candidates: list[tuple[int, int]] = []
+    for index in range(region_start, region_end):
+        level = _markdown_heading_level(lines[index])
+        if level is None or (section_level is not None and level <= section_level):
+            continue
+        if _is_record_detail_heading(lines[index]):
+            continue
+        if _heading_line_matches(lines[index], all_headings_pattern):
+            continue
+        markdown_candidates.append((index, level))
+    starts: set[int] = set()
+    if markdown_candidates:
+        peer_level = min(level for _, level in markdown_candidates)
+        starts.update(index for index, level in markdown_candidates if level == peer_level)
+
+    for index in range(region_start, region_end):
+        content = _strong_heading_content(lines[index])
+        if not content or _is_record_detail_heading(lines[index]):
+            continue
+        if _heading_line_matches(content, all_headings_pattern):
+            continue
+        starts.add(index)
+    return starts
+
+
+def _record_scope_body(scope: str) -> str:
+    lines = scope.splitlines()
+    if len(lines) <= 1:
+        return ""
+    body_lines = [line for line in lines[1:] if not _is_record_detail_heading(line)]
+    body = "\n".join(body_lines).strip()
+    compact = re.sub(r"[\s\W_]+", "", body, flags=re.UNICODE)
+    return body if compact else ""
 
 
 def _anchor_is_on_line(anchor: str, line: str) -> bool:
@@ -1062,6 +1143,7 @@ def record_collection_scopes(
     collection_pointer: str,
     heading_pattern: re.Pattern[str],
     all_headings_pattern: re.Pattern[str],
+    mapped_substantive_detail_groups: Sequence[Sequence[str]] | None = None,
 ) -> RecordCollectionScopeResult:
     """Resolve every canonical record to one raw multi-line scope.
 
@@ -1069,7 +1151,9 @@ def record_collection_scopes(
     low-noise raw record header and ends at the next peer header or section
     heading. All anchors for a canonical record must occur in exactly one such
     scope. When an explicit raw header is left unclaimed, omission is a hard
-    violation. Ambiguous input fails closed without exposing source text.
+    violation. A resolved scope with substantive body content must map at least
+    one substantive detail, even when source formatting was stripped. Ambiguous
+    input fails closed without exposing source text.
     """
 
     line_values = raw_text.splitlines(keepends=True)
@@ -1093,25 +1177,39 @@ def record_collection_scopes(
         for index, line in enumerate(line_values)
         if _heading_line_matches(line, heading_pattern)
     ]
-    regions: list[tuple[int, int]] = []
+    regions: list[tuple[int, int, int | None]] = []
     if target_headings:
         for heading_index in target_headings:
             end_index = len(line_values)
+            section_level = _markdown_heading_level(line_values[heading_index])
             for index in range(heading_index + 1, len(line_values)):
-                if _heading_line_matches(line_values[index], all_headings_pattern):
+                candidate_level = _markdown_heading_level(line_values[index])
+                if _heading_line_matches(line_values[index], all_headings_pattern) and (
+                    section_level is None
+                    or candidate_level is None
+                    or candidate_level <= section_level
+                ):
                     end_index = index
                     break
             if heading_index + 1 < end_index:
-                regions.append((heading_index + 1, end_index))
+                regions.append((heading_index + 1, end_index, heading_index))
     else:
-        regions.append((0, len(line_values)))
+        regions.append((0, len(line_values), None))
 
     normalized_groups = tuple(
         tuple(anchor for anchor in anchors if normalize_text(anchor).strip())
         for anchors in anchor_groups
     )
     candidate_starts: dict[int, bool] = {}
-    for region_start, region_end in regions:
+    for region_start, region_end, section_heading_index in regions:
+        for index in _structural_record_starts(
+            line_values,
+            region_start,
+            region_end,
+            section_heading_index=section_heading_index,
+            all_headings_pattern=all_headings_pattern,
+        ):
+            candidate_starts[index] = True
         for index in range(region_start, region_end):
             preceded_by_blank = index == region_start or not line_values[index - 1].strip()
             if _looks_like_record_header(line_values[index], preceded_by_blank=preceded_by_blank):
@@ -1150,7 +1248,7 @@ def record_collection_scopes(
                 candidate_starts.setdefault(index, False)
 
     spans: list[tuple[str, bool, bool]] = []
-    for region_start, region_end in regions:
+    for region_start, region_end, _ in regions:
         starts = sorted(index for index in candidate_starts if region_start <= index < region_end)
         for position, start_index in enumerate(starts):
             end_index = starts[position + 1] if position + 1 < len(starts) else region_end
@@ -1210,6 +1308,28 @@ def record_collection_scopes(
                 )
             )
             scope_indexes[record_index] = None
+
+    if mapped_substantive_detail_groups is not None:
+        if len(mapped_substantive_detail_groups) != len(normalized_groups):
+            raise ValueError("mapped_substantive_detail_groups must align with anchor_groups")
+        for record_index, scope_index in enumerate(scope_indexes):
+            if scope_index is None:
+                continue
+            body = _record_scope_body(spans[scope_index][0])
+            if not body:
+                continue
+            details = tuple(
+                value
+                for value in mapped_substantive_detail_groups[record_index]
+                if normalize_text(value).strip()
+            )
+            if not any(direct_fact_is_grounded(value, body) for value in details):
+                violations.add(
+                    AuditViolation(
+                        "canonical_record_details_missing",
+                        f"{collection_pointer}/{record_index}",
+                    )
+                )
 
     has_claimed_explicit_header = any(
         scope_index < len(spans) and spans[scope_index][1] for scope_index in claimed
